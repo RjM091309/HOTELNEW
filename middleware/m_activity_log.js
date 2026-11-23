@@ -47,6 +47,7 @@ const ACTION_MAP = {
   'POST /booking/apply-discount': 'DISCOUNT_APPLY',
   'POST /booking/process-payment': 'PAYMENT_ADD',
   'POST /booking/pay-service': 'PAYMENT_ADD',
+  'POST /booking/pay-room': 'PAYMENT_ADD',
   'POST /booking/late_checkout': 'LATE_CHECKOUT',
   'POST /booking/set-maintenance': 'MAINTENANCE_SET',
   'POST /booking/reopen-maintenance': 'MAINTENANCE_REOPEN',

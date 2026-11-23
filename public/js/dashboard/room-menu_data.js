@@ -1773,7 +1773,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                 <span class="bd-icon"><i class="fas fa-file-invoice"></i></span>Guest Bill
                                 <span class="gb-actions float-end"><button type="button" class="btn btn-sm gb-btn gb-toggle" onclick="window.toggleGuestBill('${bookingId}')" title="Collapse / expand the bill"><i class="fas fa-chevron-up"></i></button>
                                     <button type="button" class="btn btn-sm gb-btn" onclick="(window.printBillingReceiptFor || window.showBilling)('${bookingId}')" title="Print the billing receipt"><i class="fas fa-print me-1"></i>Receipt</button>
-                                    <button type="button" class="btn btn-sm gb-btn gb-btn-pay" ${actionButtonAttributes} onclick="window.showBilling('${bookingId}')" style="${actionButtonStyle}" title="Billing receipt, then Proceed to Payment"><i class="fas fa-plus me-1"></i>Payment</button>
+                                    <button type="button" class="btn btn-sm gb-btn gb-btn-pay" ${actionButtonAttributes} onclick="window.bdPay('${bookingId}')" style="${actionButtonStyle}" title="Billing receipt, then Proceed to Payment"><i class="fas fa-plus me-1"></i>Payment</button>
                                 </span>
                             </h6>
                             <div class="gb-lines" id="guest-bill-lines-${bookingId}"><div class="gb-line text-muted">Loading bill…</div></div>
@@ -3605,6 +3605,17 @@ if (roomServices.length === 0) {
                </button>`
             : '';
 
+        // Under the name of a service that was paid (or partly paid): who took the payment, when, how, and the remarks if there are any
+        let paidInfo = '';
+        if (service.PAID_DT && ['paid', 'partial'].includes(String(service.STATUS || '').toLowerCase())) {
+            const escT = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            const dt = new Date(service.PAID_DT);
+            const when = isNaN(dt) ? '' : dt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+            const how = service.PAID_METHOD ? (typeof formatPaymentMethodLabel === 'function' ? formatPaymentMethodLabel(service.PAID_METHOD) : String(service.PAID_METHOD).replace(/_/g, ' ')) : '';
+            const part = String(service.STATUS).toLowerCase() === 'partial' ? `Paid ₱${(parseFloat(service.PAID_AMOUNT) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} so far` : 'Paid';
+            paidInfo = `<div class="svc-paid-info" style="font-size: 0.72rem; line-height: 1.3; color: #6c757d; margin-top: 2px;">${part}${service.PAID_BY ? ' by <b>' + escT(service.PAID_BY) + '</b>' : ''}${when ? ' &middot; ' + escT(when) : ''}${how ? ' &middot; ' + escT(how) : ''}${service.PAID_REMARKS ? '<br><i>&ldquo;' + escT(service.PAID_REMARKS) + '&rdquo;</i>' : ''}</div>`;
+        }
+
         const serviceRow = document.createElement('div');
         serviceRow.className = 'service-item mb-1';
         serviceRow.style.cssText = 'background: #ffffff; color: #333333; border: 1px solid #e9ecef; border-radius: 6px; padding: 8px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
@@ -3624,6 +3635,7 @@ if (roomServices.length === 0) {
                 <div class="col-4">
                     <div class="d-flex flex-column">
                         <span style="font-weight: 600; color: #495057; font-size: 0.9rem;">${service.SERVICE_NAME || 'Unknown Service'}</span>
+                        ${paidInfo}
                     </div>
                 </div>
                 <div class="col-2 text-center">
@@ -4256,6 +4268,7 @@ fetch('/booking/save-booking-services', {
                             STATUS: service.STATUS || "unpaid",
                             IS_CUSTOM: service.SERVICE_ID === -1,
                             BS_ID: service.BS_ID,
+                            PAID_BY: service.PAID_BY, PAID_DT: service.PAID_DT, PAID_METHOD: service.PAID_METHOD, PAID_REMARKS: service.PAID_REMARKS, PAID_AMOUNT: service.PAID_AMOUNT,
                             ALREADY_SAVED: true // Mark as already saved to prevent duplicate saves
                         });
                     }
@@ -4376,6 +4389,134 @@ Swal.fire({
 });
 }
 
+// ---- The Payment button of the Guest Bill. A normal booking opens the usual billing / payment windows. A room of a group that shares one bill
+// pays only ITSELF; the MAIN room chooses "this room only" or "the whole group" (the whole group = the usual payment window, as before).
+window.bdPay = async function (bookingId) {
+    if (window.__bdPayBusy) return;   // one click at a time (a double click would open the window twice)
+    window.__bdPayBusy = true;
+    try { await bdPayRun(bookingId); } finally { window.__bdPayBusy = false; }
+};
+async function bdPayRun(bookingId) {
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    let bill = null;
+    try {
+        const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 6000);   // a slow answer: the usual billing window opens
+        bill = await (await fetch(`/booking/room-bill/${realId}?_=${Date.now()}`, { signal: ctl.signal })).json();
+        clearTimeout(timer);
+    } catch (e) { bill = null; }
+    if (!bill || !bill.success || !bill.isMaster || !Array.isArray(bill.rooms) || bill.rooms.length < 2) return window.showBilling(bookingId);
+    if (!bill.isMain) return window.bdPayRoom(bookingId, bill);
+    const money = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const focusState = suspendBsFocusTrap();
+    const res = await Swal.fire({
+        title: 'What does the guest pay?',
+        html: `<div style="text-align:left;font-size:.92rem;">
+            <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #dee2e6;border-radius:8px;margin-bottom:8px;cursor:pointer;">
+                <input type="radio" name="bdPayScope" value="room" checked style="margin-top:4px;">
+                <span><b>This room only</b> (Room ${esc(bill.roomNo)})<br><small style="color:#6c757d;">Its room, extension and services</small></span>
+                <b style="margin-left:auto;white-space:nowrap;">${money(bill.own.balance)}</b>
+            </label>
+            <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #dee2e6;border-radius:8px;cursor:pointer;">
+                <input type="radio" name="bdPayScope" value="group" style="margin-top:4px;">
+                <span><b>The whole group</b> (${bill.rooms.length} rooms)<br><small style="color:#6c757d;">Every room of ${esc(bill.groupName)}</small></span>
+                <b style="margin-left:auto;white-space:nowrap;">${money(bill.group.balance)}</b>
+            </label>
+        </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Continue',
+        confirmButtonColor: '#28a745',
+        heightAuto: false,
+        preConfirm: () => (document.querySelector('input[name="bdPayScope"]:checked') || {}).value || 'room'
+    });
+    restoreCheckoutModalFocus(focusState);
+    if (!res.isConfirmed) return;
+    if (res.value === 'group') return window.showBilling(bookingId);
+    return window.bdPayRoom(bookingId, bill);
+}
+
+// Pay ONE room of the group: how much and how, nothing of the other rooms is touched.
+window.bdPayRoom = async function (bookingId, bill) {
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    const money = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    try {
+        if (!bill) bill = await (await fetch(`/booking/room-bill/${realId}?_=${Date.now()}`)).json();
+    } catch (e) { bill = null; }
+    if (!bill || !bill.success || !bill.isMaster) return window.showBilling(bookingId);
+    const o = bill.own;
+    if (o.balance <= 0.004) { toastInfo('Info', `Room ${bill.roomNo} is fully paid.`); return; }
+    const row = (label, x) => (x.total > 0 ? `<div style="display:flex;justify-content:space-between;"><span>${label}</span><span>${x.remaining > 0 ? money(x.remaining) : '<span style="color:#28a745;">Paid</span>'}</span></div>` : '');
+    const focusState = suspendBsFocusTrap();
+    const res = await Swal.fire({
+        title: `Pay Room ${bill.roomNo}`,
+        html: `<div style="text-align:left;font-size:.9rem;">
+            <div style="padding:8px 10px;background:#f1f3f5;border-radius:6px;margin-bottom:8px;color:#343a40;">
+                ${row('Room', o.room)}${row('Extension', o.extension)}${row('Services', o.services)}${row('Penalty', o.penalty)}
+                <div style="display:flex;justify-content:space-between;border-top:1px solid #ced4da;margin-top:4px;padding-top:4px;"><b>To pay now</b><b>${money(o.balance)}</b></div>
+            </div>
+            <div style="font-size:.78rem;color:#6c757d;margin-bottom:6px;">Only this room is paid (the room first, then its extension and services).</div>
+            <label style="font-size:.8rem;margin:0;">Amount</label>
+            <input id="prAmount" type="number" class="swal2-input" style="margin:2px 0 8px;width:100%;" min="0.01" max="${o.balance}" step="0.01" value="${o.balance}">
+            <label style="font-size:.8rem;margin:0;">Paid by</label>
+            <select id="prMethod" class="swal2-select" style="margin:2px 0 8px;width:100%;">
+                <option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="credit_card">Credit card</option>
+                <option value="korean_bank">Korean bank</option><option value="agoda">Agoda</option><option value="expedia">Expedia</option>
+            </select>
+            <label style="font-size:.8rem;margin:0;">Notes (optional)</label>
+            <input id="prNotes" type="text" class="swal2-input" style="margin:2px 0 0;width:100%;" maxlength="200">
+        </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Pay',
+        confirmButtonColor: '#28a745',
+        heightAuto: false,
+        focusConfirm: false,
+        preConfirm: () => {
+            const amount = parseFloat(document.getElementById('prAmount').value);
+            if (!(amount > 0)) { Swal.showValidationMessage('Enter the amount to pay.'); return false; }
+            if (amount > o.balance + 0.005) { Swal.showValidationMessage('That is more than what is left (' + money(o.balance) + ').'); return false; }
+            return { amount, method: document.getElementById('prMethod').value, notes: document.getElementById('prNotes').value.trim() };
+        }
+    });
+    restoreCheckoutModalFocus(focusState);
+    if (!res.isConfirmed) return;
+    try {
+        const r = await fetch('/booking/pay-room', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: realId, paymentAmount: res.value.amount, paymentMethod: res.value.method, paymentNotes: res.value.notes })
+        });
+        const j = await r.json();
+        if (!r.ok || !j || !j.success) throw new Error((j && j.message) || 'Could not save the payment');
+        await window.reloadServiceStatuses(bookingId);
+        calculateBalance(bookingId, realId);
+        try { if (typeof scheduleCalendarRefresh === 'function') scheduleCalendarRefresh(); } catch (e) { /* no-op */ }
+        toastSuccess('Paid', `Room ${bill.roomNo}: ${money(j.paid)} received.` + (j.balance > 0 ? ` ${money(j.balance)} left.` : ''));
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Not paid', text: e.message, heightAuto: false });
+    }
+};
+
+// The services of the window after a payment: status (paid / partial) and who took it, from the database.
+window.reloadServiceStatuses = async function (bookingId) {
+    try {
+        const idInput = document.getElementById(`bookingID-${bookingId}`);
+        const realId = idInput && idInput.value ? idInput.value : bookingId;
+        const r = await fetch(`/booking/get-booking-services/${realId}?_=${Date.now()}`);
+        const j = await r.json();
+        const list = j.data || j;
+        const byBs = {};
+        (Array.isArray(list) ? list : []).forEach((x) => { if (x.BS_ID) byBs[x.BS_ID] = x; });
+        (addedServicesMap[bookingId] || []).forEach((svc) => {
+            const x = svc.BS_ID && byBs[svc.BS_ID];
+            if (!x) return;
+            svc.STATUS = x.STATUS || svc.STATUS;
+            svc.PAID_BY = x.PAID_BY; svc.PAID_DT = x.PAID_DT; svc.PAID_METHOD = x.PAID_METHOD; svc.PAID_REMARKS = x.PAID_REMARKS; svc.PAID_AMOUNT = x.PAID_AMOUNT;
+        });
+        updateAddedServicesList(bookingId);
+    } catch (e) { /* the list keeps what it had */ }
+};
+
 // ---- Pay ONE extra service (the green coin on a service row): how it is paid and how much, nothing else on the bill is touched ----
 window.payService = async function (index, bookingId) {
     const svc = (addedServicesMap[bookingId] || [])[index];
@@ -4389,6 +4530,7 @@ window.payService = async function (index, bookingId) {
         if (!r.ok || !bal || !bal.success) throw new Error((bal && bal.message) || 'Could not read the balance');
     } catch (e) { toastError('Error', e.message); return; }
     if (bal.remaining <= 0) { toastInfo('Info', 'This service is already paid.'); svc.STATUS = 'paid'; updateAddedServicesList(bookingId); return; }
+    const focusState = suspendBsFocusTrap();   // the room modal's focus trap would take the cursor away from the Notes / Amount boxes
     const res = await Swal.fire({
         title: 'Pay ' + esc(svc.SERVICE_NAME || 'service'),
         html: `<div style="text-align:left;font-size:.9rem;">
@@ -4416,6 +4558,7 @@ window.payService = async function (index, bookingId) {
             return { amount, method: document.getElementById('psMethod').value, notes: document.getElementById('psNotes').value.trim() };
         }
     });
+    restoreCheckoutModalFocus(focusState);
     if (!res.isConfirmed) return;
     const idInput = document.getElementById(`bookingID-${bookingId}`);
     const realId = idInput && idInput.value ? idInput.value : bookingId;
@@ -4427,6 +4570,7 @@ window.payService = async function (index, bookingId) {
         const j = await r.json();
         if (!r.ok || !j || !j.success) throw new Error((j && j.message) || 'Could not save the payment');
         svc.STATUS = j.status;
+        svc.PAID_BY = j.paidBy; svc.PAID_DT = j.paidAt; svc.PAID_METHOD = j.method; svc.PAID_REMARKS = j.notes; svc.PAID_AMOUNT = j.paidTotal;
         updateAddedServicesList(bookingId);
         calculateBalance(bookingId, realId);
         try { if (typeof scheduleCalendarRefresh === 'function') scheduleCalendarRefresh(); } catch (e) { /* no-op */ }
@@ -5492,7 +5636,18 @@ async function calculateBalance(bookingId, currentBookingId) {
 
 // Master Billing (like KGrand): a room that is NOT the main booking has no bill of its own - its window shows the
 // group's single Total / Paid / Balance and says where the payments are recorded (the main booking).
+// (one run at a time per window: the bill is redrawn after every change, and two runs at once would write the note and the lines twice)
 async function applyMasterGroupSummary(bookingId) {
+    window.__mgsBusy = window.__mgsBusy || {};
+    if (window.__mgsBusy[bookingId]) { window.__mgsBusy[bookingId] = 2; return; }
+    window.__mgsBusy[bookingId] = 1;
+    try { await applyMasterGroupSummaryRun(bookingId); } finally {
+        const again = window.__mgsBusy[bookingId] === 2;
+        window.__mgsBusy[bookingId] = 0;
+        if (again) applyMasterGroupSummary(bookingId);
+    }
+}
+async function applyMasterGroupSummaryRun(bookingId) {
     try {
         const idInput = document.getElementById(`bookingID-${bookingId}`);
         const realId = idInput && idInput.value ? idInput.value : bookingId;
@@ -5502,14 +5657,21 @@ async function applyMasterGroupSummary(bookingId) {
         if (d && d.success && d.isMaster) markGuestBillGroup(bookingId);
         if (!d || !d.success || !d.isMaster || d.isMain) { if (old) old.remove(); return; }
         const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        // This room's OWN bill (its room, extension, services, penalty) - every room of the group can be paid on its own. Falls back to the group's numbers.
+        let rb = null;
+        try { rb = await (await fetch(`/booking/room-bill/${realId}?_=${Date.now()}`)).json(); } catch (e) { rb = null; }
+        const own = rb && rb.success && rb.isMaster && rb.own ? rb.own : null;
+        const T = own ? { total: own.total, paid: own.paid, balance: own.balance } : { total: d.total, paid: d.paid, balance: d.balance };
         const grand = document.getElementById(`grand-total-${bookingId}`);
-        if (grand) grand.innerHTML = `<span class="text-primary"><strong>₱${money(d.total)}</strong></span>`;
+        if (grand) grand.innerHTML = `<span class="text-primary"><strong>₱${money(T.total)}</strong></span>`;
         const paid = document.getElementById(`Paid-${bookingId}`);
-        if (paid) paid.innerHTML = `<span class="text-success"><strong>₱${money(d.paid)}</strong></span>`;
+        if (paid) paid.innerHTML = `<span class="text-success"><strong>₱${money(T.paid)}</strong></span>`;
         const bal = document.getElementById(`Balance-${bookingId}`);
-        if (bal) bal.innerHTML = d.balance > 0 ? `<span class="text-danger"><strong>₱${money(d.balance)}</strong></span>` : '<span class="text-success"><strong>₱0.00</strong></span>';
+        if (bal) bal.innerHTML = T.balance > 0 ? `<span class="text-danger"><strong>₱${money(T.balance)}</strong></span>` : '<span class="text-success"><strong>₱0.00</strong></span>';
         const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-        const html = `Part of group <b>${esc(d.groupName)}</b>. The group's bill, payments and refunds are on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-open-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a>`;
+        const html = own
+            ? `Part of group <b>${esc(d.groupName)}</b>. This room's own bill is shown and it is paid on its own here. The whole group's bill is on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-open-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a>`
+            : `Part of group <b>${esc(d.groupName)}</b>. The group's bill, payments and refunds are on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-open-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a>`;
         let note = old;
         if (!note) {
             note = document.createElement('div');
@@ -5539,12 +5701,23 @@ async function applyMasterGroupSummary(bookingId) {
                 if (gbIcon) gbIcon.className = 'fas fa-chevron-up';
             }
             gbLines.insertAdjacentHTML('beforeend',
-                `<div class="gb-note gb-group" style="padding:6px 2px;">The group's full bill, payments and refunds are on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-gb-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a></div>`);
+                `<div class="gb-note gb-group" style="padding:6px 2px;">${own ? 'This room is paid on its own. ' : ''}The group's full bill, payments and refunds are on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-gb-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a></div>`);
+            if (own) {
+                // what this room has paid and what it still owes, and whether its room charge is paid
+                const roomLine = gbLines.querySelector('[data-mate-room] .gb-label');
+                if (roomLine && !roomLine.querySelector('.gb-st')) {
+                    const k = own.room.remaining <= 0.004 ? 'paid' : (own.room.paid > 0.004 ? 'partial' : 'unpaid');
+                    roomLine.insertAdjacentHTML('beforeend', ` <small class="gb-st gb-st-${k === 'paid' ? 'paid' : 'unpaid'}">${k === 'paid' ? 'Paid' : (k === 'partial' ? 'Partial' : 'Unpaid')}</small>`);
+                }
+                gbLines.insertAdjacentHTML('beforeend',
+                    `<div class="gb-line gb-state"><span class="gb-label">Paid</span><span class="gb-amt">₱${money(own.paid)}</span></div>` +
+                    `<div class="gb-line gb-state"><span class="gb-label">${own.balance > 0 ? 'Balance still owed' : 'Fully paid'}</span><span class="gb-amt">₱${money(own.balance)}</span></div>`);
+            }
             const gbLink = gbLines.querySelector('[data-gb-main]');
             if (gbLink) gbLink.addEventListener('click', (e) => { e.preventDefault(); const l = document.querySelector(`#group-note-${bookingId} [data-open-main]`); if (l) l.click(); });
         }
         const gbPay = document.querySelector(`#guest-bill-${bookingId} .gb-btn-pay`);
-        if (gbPay) gbPay.style.display = 'none';
+        if (gbPay) { gbPay.style.display = own ? '' : 'none'; if (own) gbPay.setAttribute('onclick', `window.bdPay('${bookingId}')`); }
         note.innerHTML = html;
         const link = note.querySelector('[data-open-main]');
         if (link) link.addEventListener('click', (e) => {
@@ -11089,6 +11262,7 @@ function loadExistingServicesForModal(bookingId) {
                         STATUS: service.STATUS || 'unpaid',
                         IS_CUSTOM: service.SERVICE_ID === -1,
                         BS_ID: service.BS_ID,
+                        PAID_BY: service.PAID_BY, PAID_DT: service.PAID_DT, PAID_METHOD: service.PAID_METHOD, PAID_REMARKS: service.PAID_REMARKS, PAID_AMOUNT: service.PAID_AMOUNT,
                         ALREADY_SAVED: true // Mark as already saved since it came from database
                     });
                 });

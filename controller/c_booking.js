@@ -1,4 +1,6 @@
 const BookingModel = require('../models/bookingModel');
+const GroupRoomPayment = require('../models/groupRoomPaymentModel');
+const { queryDatabasePromise: queryDb } = require('../config/database');
 const { loadPropertyLogoDataUri, loadPropertyInfo } = require('../helpers/propertyBranding');
 const moment = require('moment');
 
@@ -1565,6 +1567,36 @@ class BookingController {
       res.status(500).json({ 
         error: 'Transaction failed. Payment not processed.' 
       });
+    }
+  }
+
+  // GET /booking/room-bill/:id - the bill of ONE room of a group that shares one bill (and the group's, for the main room)
+  static async roomBill(req, res) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [b] = await queryDb('SELECT IDNo FROM booking WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1', [id, req.propertyId]);
+      if (!b) return res.status(404).json({ success: false, message: 'Booking not found.' });
+      res.json({ success: true, ...(await GroupRoomPayment.roomBill(id)) });
+    } catch (error) {
+      console.error('Error reading the room bill:', error);
+      res.status(500).json({ success: false, message: 'Could not read the room bill.' });
+    }
+  }
+
+  // POST /booking/pay-room { bookingId, paymentAmount, paymentMethod, paymentNotes } - the guest pays ONE room of the group (not the whole group)
+  static async payRoom(req, res) {
+    try {
+      const { bookingId, paymentAmount, paymentMethod, paymentNotes } = req.body;
+      const id = parseInt(bookingId, 10);
+      if (paymentAmount != null && paymentAmount !== '' && !(parseFloat(paymentAmount) > 0)) return res.status(400).json({ success: false, message: 'Enter the amount to pay.' });
+      const [b] = await queryDb('SELECT IDNo FROM booking WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1', [id, req.propertyId]);
+      if (!b) return res.status(404).json({ success: false, message: 'Booking not found.' });
+      const result = await GroupRoomPayment.payRoomOnly({ bookingId: id, amount: paymentAmount, paymentMethod, paymentNotes: paymentNotes || '', encodedBy: req.user.userId });
+      if (result.error) return res.status(400).json({ success: false, message: result.error });
+      res.json({ success: true, message: 'Room paid.', ...result });
+    } catch (error) {
+      console.error('Error paying a room of a group:', error);
+      res.status(500).json({ success: false, message: 'Could not save the payment.' });
     }
   }
 

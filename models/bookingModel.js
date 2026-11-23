@@ -3215,7 +3215,12 @@ class BookingModel {
           bs.TOTAL_COST, 
           bs.STATUS, 
           bs.ENCODED_DT,
-          bs.IDNo AS BS_ID
+          bs.IDNo AS BS_ID,
+          (SELECT COALESCE(u.FULLNAME, u.USERNAME) FROM payments p LEFT JOIN user_info u ON u.IDno = p.ENCODED_BY WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_BY,
+          (SELECT p.PAYMENT_DATE FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_DT,
+          (SELECT p.PAYMENT_METHOD FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_METHOD,
+          (SELECT p.REMARKS FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_REMARKS,
+          (SELECT COALESCE(SUM(p2.AMOUNT_PAID), 0) FROM payments p2 WHERE p2.BOOKING_SERVICE_ID = bs.IDNo AND p2.PAYMENT_TYPE = 'service') AS PAID_AMOUNT
         FROM booking_service bs
         LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
@@ -4183,11 +4188,16 @@ class BookingModel {
   static async payService({ bookingServiceId, amount, paymentMethod, paymentNotes, encodedBy, propertyId }) {
     const methods = ['cash', 'bank_transfer', 'credit_card', 'korean_bank', 'agoda', 'expedia'];
     if (!methods.includes(String(paymentMethod))) return { error: 'Pick how the guest pays.' };
+    // the service row is locked while its balance is read and the payment saved (a second click waits and then sees it paid)
+    const lock = await pool.promise().getConnection();
+    try {
+    await lock.beginTransaction();
+    await lock.query('SELECT IDNo FROM booking_service WHERE IDNo = ? FOR UPDATE', [bookingServiceId]);
     const bal = await BookingModel.serviceBalance(bookingServiceId, propertyId);
-    if (!bal) return { error: 'That service was not found.' };
-    if (bal.remaining <= 0) return { error: 'That service is already paid.' };
+    if (!bal) { await lock.rollback(); return { error: 'That service was not found.' }; }
+    if (bal.remaining <= 0) { await lock.rollback(); return { error: 'That service is already paid.' }; }
     const want = amount == null || amount === '' ? bal.remaining : parseFloat(amount);
-    if (!(want > 0)) return { error: 'Enter the amount to pay.' };
+    if (!(want > 0)) { await lock.rollback(); return { error: 'Enter the amount to pay.' }; }
     const pay = Math.min(bal.remaining, +want.toFixed(2));
     await queryDatabasePromise(
       `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
@@ -4203,7 +4213,15 @@ class BookingModel {
         [bal.bookingId, String(paymentNotes).trim(), encodedBy]
       );
     }
-    return { success: true, bookingId: bal.bookingId, paid: pay, remaining, status };
+    const [who] = await queryDatabasePromise('SELECT COALESCE(FULLNAME, USERNAME) AS name FROM user_info WHERE IDno = ?', [encodedBy]);
+    await lock.commit();
+    return { success: true, bookingId: bal.bookingId, paid: pay, remaining, status, paidBy: who ? who.name : null, paidAt: new Date().toISOString(), method: paymentMethod, notes: paymentNotes || null, paidTotal: +(bal.paid + pay).toFixed(2) };
+    } catch (e) {
+      try { await lock.rollback(); } catch (er) { /* already rolled back */ }
+      throw e;
+    } finally {
+      lock.release();
+    }
   }
 
   static async processPayment(params) {

@@ -399,6 +399,9 @@ class CalendarModel {
         LIMIT 2000
       `, queryParams);
       
+      // a group whose rooms were paid on their own: each bar shows its own room's balance and colour
+      try { await require('./groupRoomPaymentModel').applyPerRoomStatus(rows); } catch (e) { console.warn('per-room payment status skipped:', e.message); }
+
       // Format the data for FullCalendar
       return rows.map(row => {
         // Ensure proper date formatting for FullCalendar

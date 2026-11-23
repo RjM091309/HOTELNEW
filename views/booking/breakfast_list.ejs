@@ -41,25 +41,29 @@
                 <th>GUEST NAME</th>
                 <th style="width:120px;">ROOM</th>
                 <th class="text-center" style="width:150px;">BREAKFAST COUNT</th>
+                <th class="bl-sign" style="width:34%;">SIGNATURE / REMARKS</th>
               </tr>
             </thead>
             <tbody id="breakfastListBody">
-              <tr><td colspan="4" class="text-center text-muted py-4">Loading&hellip;</td></tr>
+              <tr><td colspan="5" class="text-center text-muted py-4">Loading&hellip;</td></tr>
             </tbody>
             <tfoot>
               <tr class="breakfast-total-row">
                 <th colspan="3" class="text-end">TOTAL</th>
                 <th class="text-center" id="breakfastTotal">0</th>
+                <th class="bl-sign"></th>
               </tr>
               <tr class="breakfast-less-row">
                 <th colspan="3" class="text-end">LESS <span id="breakfastLessPct">10</span>%</th>
                 <th class="text-center" id="breakfastLess">0</th>
+                <th class="bl-sign"></th>
               </tr>
               <tr class="breakfast-net-row">
                 <th colspan="3" class="text-end">
                   <span class="bl-screen-only">NET COUNT</span><span class="bl-print-only">TOTAL <span id="breakfastNetPct">10</span>% discount applied</span>
                 </th>
                 <th class="text-center" id="breakfastNet">0</th>
+                <th class="bl-sign"></th>
               </tr>
             </tfoot>
           </table>
@@ -278,7 +282,15 @@
     color: #111827 !important;
   }
 
+  /* The signature / remarks column is only for the printed copy: the guest signs there (or the kitchen writes a remark) */
+  #breakfast_list_tbl .bl-sign { display: none; }
+
   @media print {
+    #breakfast_list_tbl .bl-sign { display: table-cell; }
+    #breakfast_list_tbl tbody td { height: 36px; vertical-align: middle; }
+    #breakfast_list_tbl.bl-compact tbody td { height: 30px; }
+    #breakfast_list_tbl.bl-dense tbody td { height: 26px; }
+    #breakfast_list_tbl.bl-ultra tbody td { height: 22px; }
     .sidebar, .navbar, .app-header, .app-sidebar, .breakfast-list-controls { display: none !important; }
     body, .breakfast-list-card, .dashboard-card, .dashboard-card-header, .dashboard-card-body {
       background: #fff !important;
@@ -399,7 +411,7 @@
     function render(rows) {
       applyDensity(rows.length);
       if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No checked-in guests with breakfast.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No checked-in guests with breakfast.</td></tr>';
         return;
       }
       body.innerHTML = rows.map((r, i) => `
@@ -408,6 +420,7 @@
           <td>${esc(r.GUEST_NAME || 'N/A')}</td>
           <td><strong>${esc(r.ROOM_NUMBER || '-')}</strong></td>
           <td class="text-center"><strong>${Number(r.BREAKFAST_COUNT) || 0}</strong></td>
+          <td class="bl-sign"></td>
         </tr>
       `).join('');
     }
@@ -421,12 +434,12 @@
     }
 
     function load() {
-      body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Loading&hellip;</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Loading&hellip;</td></tr>';
       fetch('/booking/breakfast-list/data?serving=' + encodeURIComponent(serving))
         .then((res) => res.json())
         .then((json) => {
           if (!json.success) {
-            body.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">' + esc(json.message || 'Failed to load.') + '</td></tr>';
+            body.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">' + esc(json.message || 'Failed to load.') + '</td></tr>';
             return;
           }
           render(json.data || []);
@@ -436,7 +449,7 @@
           stamp();
         })
         .catch(() => {
-          body.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">Failed to load breakfast list.</td></tr>';
+          body.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Failed to load breakfast list.</td></tr>';
         });
     }
 

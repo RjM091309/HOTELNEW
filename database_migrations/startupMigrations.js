@@ -1119,6 +1119,12 @@ async function runPoolVillaViewMigration() {
   if (res && res.affectedRows) console.log('✅ Pool Villa: dashboard shows the villas');
 }
 
+// Paying one room of a group that shares one bill (models/groupRoomPaymentModel.js): a room payment is kept on the main booking and says which room it paid.
+async function runRoomPaymentAttributionMigration() {
+  const added = await ensureColumn('payments', 'ROOM_BOOKING_ID', 'ROOM_BOOKING_ID INT NULL DEFAULT NULL');
+  if (added) { try { await queryDatabasePromise('CREATE INDEX idx_payments_room_booking ON payments (ROOM_BOOKING_ID)'); } catch (e) { /* the index is only a speed-up */ } }
+}
+
 async function runRoomRequestMigrations() {
   const created = await ensureTable('room_request', `
     CREATE TABLE IF NOT EXISTS room_request (
@@ -1368,6 +1374,7 @@ async function runStartupMigrations() {
   await runRoomRequestMigrations();
   await runStaffAppSessionMigrations();
   await runMainRoomFormMigration();
+  await runRoomPaymentAttributionMigration();
   await runPoolVillaViewMigration();
   // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
   // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).
