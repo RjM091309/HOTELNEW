@@ -16,6 +16,8 @@ router.post('/rooms/:id/housekeeping', StaffApp.setRoomCleaning);
 router.post('/rooms/:id/charges', StaffApp.postRoomCharge);
 router.get('/charge-items', StaffApp.chargeItems);
 router.get('/movements', StaffApp.movements);
+router.get('/version', StaffApp.version);
+router.get('/apk', StaffApp.apk);
 router.all(['/trips', '/trips/*', '/room-tablet/*'], StaffApp.notHere);
 
 // The app runs on its own origin (https://localhost in the APK, a dev server on another port), so the browser asks first (CORS).

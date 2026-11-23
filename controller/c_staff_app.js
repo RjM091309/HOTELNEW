@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 const AuthModel = require('../models/authModel');
 const StaffAppModel = require('../models/staffAppModel');
 const RoomRequestModel = require('../models/roomRequestModel');
@@ -58,6 +60,27 @@ function tell(req, s, what) {
   try { const io = req.app.get('io'); if (io) io.emit('dashboard-updated', { source: 'housekeeping-app', propertyId: s.propertyId, action: what }); } catch (e) { /* their refresh still runs */ }
   staffRealtime.changed(s.propertyId);
   staffRealtime.tasks(s.propertyId);
+}
+
+// The phone app's own updates: app-releases/<app>/version.json { versionCode, versionName, releaseNotes, file } next to the APK
+// (written by Hotelapp/standalone-apks/publish-hk-update.ps1).
+const RELEASES_DIR = path.join(__dirname, '..', 'app-releases');
+
+async function publishedRelease(app) {
+  if (!APPS[app]) return null;
+  const dir = path.join(RELEASES_DIR, app);
+  try {
+    // a BOM (Windows PowerShell's UTF-8) would make JSON.parse fail
+    const info = JSON.parse((await fs.promises.readFile(path.join(dir, 'version.json'), 'utf8')).replace(/^﻿/, ''));
+    const versionCode = Number(info.versionCode);
+    if (!Number.isInteger(versionCode) || versionCode < 1) return null;
+    const file = path.join(dir, path.basename(String(info.file || `${app}-release.apk`)));
+    const st = await fs.promises.stat(file);
+    if (!st.isFile()) return null;
+    return { versionCode, versionName: String(info.versionName || ''), releaseNotes: String(info.releaseNotes || ''), file, size: st.size };
+  } catch (e) {
+    return null;
+  }
 }
 
 class StaffAppController {
@@ -200,6 +223,26 @@ class StaffAppController {
     audit(req, s, { action: 'SERVICE_ADD', bookingId: r.bookingId, entityType: 'booking', entityId: r.bookingId, amount: r.total, description: `Housekeeping app: ${String(b.category).toLowerCase()} for room ${room.ROOM_NUMBER} - ${r.lines.join(', ')}` });
     tell(req, s, 'room-charge');
     res.json({ total: r.total, lines: r.lines.length });
+  });
+
+  // GET /version?app=housekeeping -> the newest published build, or data: null. No sign-in: a phone signed out can still update.
+  static version = wrap(async (req, res) => {
+    const app = String(req.query.app || 'housekeeping').toLowerCase();
+    const r = await publishedRelease(app);
+    res.setHeader('Cache-Control', 'no-store');
+    if (!r) return res.json({ success: true, data: null });
+    // relative to this endpoint, so a "PMS server" with a property code (/clark_central) downloads through the same path
+    res.json({ success: true, data: { versionCode: r.versionCode, versionName: r.versionName, releaseNotes: r.releaseNotes, size: r.size, apkUrl: `apk?app=${encodeURIComponent(app)}&v=${r.versionCode}` } });
+  });
+
+  // GET /apk?app=housekeeping -> the published APK
+  static apk = wrap(async (req, res) => {
+    const r = await publishedRelease(String(req.query.app || 'housekeeping').toLowerCase());
+    if (!r) return fail(res, 404, 'No update is published.');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="${path.basename(r.file)}"`);
+    res.sendFile(r.file);
   });
 
   // the Bellman / Driver apps and the room tablets are not connected to HOTELNEW

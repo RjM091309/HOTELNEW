@@ -23,7 +23,6 @@ const agencyRoutes = require('./r_agency');
 const deleteDataRoutes = require('./r_delete_data');
 const activityLogRoutes = require('./r_activity_log');
 const apiRoutes = require('./r_api');
-const updatesRoutes = require('./r_updates');
 const mapsRoutes = require('./r_maps');
 const gpsTrackerRoutes = require('./r_gps_tracker');
 const flightScheduleRoutes = require('./r_flight_schedule');
@@ -49,7 +48,6 @@ router.use('/', loginRoutes);
 router.use('/api', apiRoutes);
 router.use('/api/maps', mapsRoutes);
 router.use('/api/gps-tracker', gpsTrackerRoutes);
-router.use('/updates', updatesRoutes);
 
 // Telegram webhook endpoint (public - Telegram needs to access this)
 const TelegramController = require('../controller/c_telegram');
