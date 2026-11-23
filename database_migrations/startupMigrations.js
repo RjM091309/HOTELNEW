@@ -1106,6 +1106,29 @@ async function runMainRoomFormMigration() {
 
 // Pool Villa's Dashboard shows its villas (public/js/dashboard/building3d.js, VILLAS) like the other hotels show their building. Switched on once at the
 // first start after this update (startup_once), so turning it off later in the property row is respected.
+// Pool Villa's three villas (13, 14, 15) are made when the property has NO room at all (a fresh database / another computer), so its Dashboard is not empty.
+// A database that already has rooms there (any number) is never touched.
+async function runPoolVillaRoomsMigration() {
+  const [prop] = await queryDatabasePromise("SELECT IDNo FROM property WHERE CODE = 'pool_villa' LIMIT 1");
+  if (!prop) return;
+  const [{ n }] = await queryDatabasePromise('SELECT COUNT(*) AS n FROM room WHERE PROPERTY_ID = ?', [prop.IDNo]);
+  if (Number(n) > 0) return;
+  let [type] = await queryDatabasePromise('SELECT IDNo FROM room_type WHERE PROPERTY_ID = ? AND ACTIVE = 1 ORDER BY IDNo LIMIT 1', [prop.IDNo]);
+  const [admin] = await queryDatabasePromise('SELECT IDno AS id FROM user_info ORDER BY PERMISSIONS ASC, IDno ASC LIMIT 1');
+  const by = admin ? admin.id : 1;
+  if (!type) {
+    const r = await queryDatabasePromise(
+      "INSERT INTO room_type (NAME, DESCRIPTION, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID) VALUES ('villa', 'villa', ?, NOW(), 1, ?)", [by, prop.IDNo]);
+    type = { IDNo: r.insertId };
+  }
+  for (const no of [13, 14, 15]) {
+    await queryDatabasePromise(
+      `INSERT INTO room (ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, ROOM_DESCRIPTION, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+       VALUES (?, ?, '1', 20, 0, '500', 0, 'villa', ?, NOW(), 1, ?)`, [type.IDNo, no, by, prop.IDNo]);
+  }
+  console.log('✅ Pool Villa: created villas 13, 14 and 15');
+}
+
 async function runPoolVillaViewMigration() {
   await queryDatabasePromise(`CREATE TABLE IF NOT EXISTS startup_once (
     NAME VARCHAR(100) NOT NULL PRIMARY KEY,
@@ -1375,6 +1398,7 @@ async function runStartupMigrations() {
   await runStaffAppSessionMigrations();
   await runMainRoomFormMigration();
   await runRoomPaymentAttributionMigration();
+  await runPoolVillaRoomsMigration();
   await runPoolVillaViewMigration();
   // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
   // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).

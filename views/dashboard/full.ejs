@@ -469,6 +469,10 @@
     // the Tenant rooms (status Tenant, any property: shown only when there are some), and the rooms of the system the building has no place for (not drawn: said here instead of hidden)
     var tenantKey = c.tenant ? '<span>' + sw(S.tenant) + 'Tenant <b>' + c.tenant + '</b></span>' : '';
     var warn = lost.length ? ' &middot; <span class="fd-bld-warn" title="These rooms exist in the system but have no place on the building">not on the building: ' + lost.map(function (x) { return esc(x.no); }).join(', ') + '</span>' : '';
+    if (!(D.building || []).length) {   // no rooms yet: say so (an empty building would leave the tiles piled up)
+      return '<div class="fd-card-head"><div class="fd-card-title">Building</div><span class="fd-card-note"></span></div>' +
+        '<div style="padding:60px 20px;text-align:center;color:var(--fd-muted);font-size:14px;"><i class="fas fa-door-open" style="font-size:30px;display:block;margin-bottom:12px;opacity:.6;"></i>No rooms yet for this property.<br><small>Add them in Rooms &rarr; Room Management.</small></div>';
+    }
     var side, legend, note;
     if (hk) {
       // HOUSEKEEPING: the work first. Dirty rooms, rooms that are about to be left (late ones too), who stays, who arrives (a dirty room with an arrival is URGENT)
