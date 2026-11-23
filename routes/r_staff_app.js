@@ -14,6 +14,7 @@ router.post('/tasks/:id/:action', StaffApp.act);
 router.get('/rooms', StaffApp.rooms);
 router.post('/rooms/:id/housekeeping', StaffApp.setRoomCleaning);
 router.post('/rooms/:id/charges', StaffApp.postRoomCharge);
+router.post('/rooms/:id/requests', StaffApp.createRoomRequest);
 router.get('/charge-items', StaffApp.chargeItems);
 router.get('/movements', StaffApp.movements);
 router.get('/building', StaffApp.building);

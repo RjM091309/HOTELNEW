@@ -226,6 +226,24 @@ class StaffAppController {
     res.json({ total: r.total, lines: r.lines.length });
   });
 
+  // POST /rooms/:id/requests { type: 'MUR' | 'CUSTOM', text } -> a new request for the room (the Dashboard's New request). An open MUR is not doubled.
+  static createRoomRequest = wrap(async (req, res) => {
+    const s = await session(req, res, 'housekeeping'); if (!s) return;
+    const type = String((req.body && req.body.type) || '').toUpperCase();
+    const text = String((req.body && req.body.text) || '').trim().slice(0, 300);
+    if (type !== 'MUR' && type !== 'CUSTOM') return fail(res, 400, 'Choose MUR or a custom request.');
+    if (type === 'CUSTOM' && !text) return fail(res, 400, 'Write what the room needs.');
+    const room = await StaffAppModel.roomById(s.propertyId, parseInt(req.params.id, 10) || 0);
+    if (!room) return fail(res, 404, 'Room not found.');
+    const r = await RoomRequestModel.create({ propertyId: s.propertyId, roomNumber: String(room.ROOM_NUMBER), type, text, userId: s.user.IDNo, userName: s.user.FULLNAME || s.user.USERNAME });
+    if (r.error) return fail(res, 404, r.error);
+    if (!r.duplicate) {
+      audit(req, s, { action: 'ROOM_REQUEST_CREATE', entityType: 'room', entityId: room.IDNo, description: `Housekeeping app: ${type === 'MUR' ? 'MUR' : `request "${text}"`} for room ${room.ROOM_NUMBER}` });
+      tell(req, s, 'room-request');
+    }
+    res.json({ id: String(r.id), duplicate: r.duplicate });
+  });
+
   // GET /building -> the property's rooms as the Dashboard's 3D building draws them (only a property with BUILDING_VIEW has one)
   static building = wrap(async (req, res) => {
     const s = await session(req, res); if (!s) return;
