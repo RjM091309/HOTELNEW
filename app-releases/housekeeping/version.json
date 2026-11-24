@@ -1,7 +1,7 @@
 {
-    "versionCode":  9,
-    "versionName":  "1.0.8",
-    "releaseNotes":  "Naka-lock sa landscape ang screen habang naka-Expand ang Building\nInayos ang sirang confirmation popup sa Expand view",
+    "versionCode":  10,
+    "versionName":  "1.0.9",
+    "releaseNotes":  "Ayos ang pag-flicker ng building sa Expand view.",
     "file":  "housekeeping-release.apk",
-    "publishedAt":  "2026-11-23T13:25:12.6752927+08:00"
+    "publishedAt":  "2026-11-23T15:01:05.4297266+08:00"
 }
