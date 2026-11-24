@@ -1,7 +1,11 @@
+// Money is shown in whole pesos (.00): a fraction such as 4,766.67 x 6 = 28,600.02 is rounded off (the total is rounded, not each part)
+var roundPeso = window.roundPeso || function (n) { var v = Number(n); return Number.isFinite(v) ? Math.round(v) : 0; };
+window.roundPeso = roundPeso;
+
 function formatBillingMoney(value) {
     const num = Number(value);
     if (!Number.isFinite(num)) return '0.00';
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return roundPeso(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // `var` (not `const`) so a second include of this file never throws
@@ -275,12 +279,6 @@ function printDiv(divId) {
         }
     });
 
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-        alert('Please allow pop-ups to print the receipt.');
-        return;
-    }
-
     const printStyles = `
         @page { size: A4 portrait; margin: 3mm; }
         * { box-sizing: border-box; }
@@ -516,29 +514,88 @@ function printDiv(divId) {
         }
     `;
 
-    printWindow.document.write(`
-        <!DOCTYPE html>
+    const docTitle = 'Billing Receipt ' + ((clone.querySelector('#billingReceiptNumber, .receipt-number') || {}).textContent || '').trim();
+    const html = `<!DOCTYPE html>
         <html>
         <head>
-            <title>Billing Receipt</title>
+            <title>${docTitle.trim()}</title>
             <base href="${origin}/">
             <style>${printStyles}</style>
             <style id="billingPrintZoomStyle"></style>
         </head>
         <body><div class="billing-print-fit ${densityClass}">${clone.innerHTML}</div></body>
-        </html>
-    `);
-    printWindow.document.close();
+        </html>`;
+    showReceiptPreview(html, docTitle.trim() || 'Billing Receipt');
+}
 
-    waitForImages(printWindow.document.body).then(() => {
-        requestAnimationFrame(() => {
-            applyBillingPrintFitScale(printWindow.document);
-            requestAnimationFrame(() => {
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
-            });
-        });
+// A small preview window (a page of paper in a card, not a whole tab): look at the receipt first, then Print or Save it as a PDF.
+function showReceiptPreview(html, title) {
+    const old = document.getElementById('receiptPreviewOverlay');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'receiptPreviewOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2000000;background:rgba(2,6,16,.62);display:flex;align-items:center;justify-content:center;padding:16px;';
+    const W = 794, H = 1123;   // an A4 page at 96 dpi
+    ov.innerHTML = `
+        <div style="background:#1a2234;color:#e8ecef;border:1px solid rgba(255,255,255,.12);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);width:min(640px,96vw);max-height:96vh;display:flex;flex-direction:column;overflow:hidden;font-family:Poppins,Arial,sans-serif;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.1);">
+                <b style="font-size:15px;">Receipt preview</b>
+                <button type="button" data-rp="close" style="background:none;border:0;color:#aab4c4;font-size:22px;line-height:1;cursor:pointer;">&times;</button>
+            </div>
+            <div data-rp="stage" style="flex:1 1 auto;overflow:auto;padding:14px;background:#0e1422;display:flex;justify-content:center;">
+                <div data-rp="frameBox" style="position:relative;background:#fff;box-shadow:0 6px 24px rgba(0,0,0,.5);flex:0 0 auto;">
+                    <iframe data-rp="frame" title="Receipt" style="border:0;background:#fff;width:${W}px;height:${H}px;transform-origin:0 0;"></iframe>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;padding:12px 16px;border-top:1px solid rgba(255,255,255,.1);">
+                <button type="button" data-rp="close" style="padding:8px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#e8ecef;cursor:pointer;">Close</button>
+                <button type="button" data-rp="save" style="padding:8px 16px;border-radius:8px;border:0;background:#4361ee;color:#fff;font-weight:600;cursor:pointer;" title="Download the receipt as a PDF file">Save as PDF</button>
+                <button type="button" data-rp="print" style="padding:8px 18px;border-radius:8px;border:0;background:#28a745;color:#fff;font-weight:600;cursor:pointer;">Print</button>
+            </div>
+        </div>`;
+    document.body.appendChild(ov);
+    const frame = ov.querySelector('[data-rp="frame"]'), box = ov.querySelector('[data-rp="frameBox"]'), stage = ov.querySelector('[data-rp="stage"]');
+    const close = () => { document.removeEventListener('keydown', onKey, true); ov.remove(); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', (e) => {
+        if (e.target === ov || e.target.closest('[data-rp="close"]')) close();
+    });
+    // the page is shown smaller to fit the card (the printed page stays A4)
+    const fit = () => {
+        const k = Math.min(1, (stage.clientWidth - 28) / W);
+        frame.style.transform = `scale(${k})`;
+        box.style.width = Math.round(W * k) + 'px';
+        box.style.height = Math.round(H * k) + 'px';
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    const doc = frame.contentDocument;
+    doc.open(); doc.write(html); doc.close();
+    waitForImages(doc.body).then(() => {
+        requestAnimationFrame(() => { applyBillingPrintFitScale(doc); fit(); });
+    });
+    const printNow = () => { frame.contentWindow.focus(); frame.contentWindow.print(); };
+    ov.querySelector('[data-rp="print"]').addEventListener('click', printNow);
+    // Save as PDF: the server makes the PDF of this same page and the browser downloads it (no print dialog)
+    const saveBtn = ov.querySelector('[data-rp="save"]');
+    saveBtn.addEventListener('click', async () => {
+        const label = saveBtn.textContent;
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving...';
+        try {
+            const r = await fetch('/booking/receipt-pdf?name=' + encodeURIComponent(title), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: html });
+            if (!r.ok) throw new Error('The PDF could not be made.');
+            const blob = await r.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (title || 'Billing Receipt').replace(/[^\w\- #.]/g, '') + '.pdf';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        } catch (e) {
+            if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', title: 'Not saved', text: e.message, heightAuto: false }); else alert(e.message);
+        } finally {
+            saveBtn.disabled = false; saveBtn.textContent = label;
+        }
     });
 }
 
@@ -822,10 +879,10 @@ window.showBilling = async function (bookingID) {
                 }
                 if (shouldShowRefundInfo) {
                     if (refundAmountElement) {
-                        refundAmountElement.textContent = refundAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        refundAmountElement.textContent = roundPeso(refundAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     }
                     if (totalPaidBeforeRefundElement) {
-                        totalPaidBeforeRefundElement.textContent = totalPaidBeforeRefund.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        totalPaidBeforeRefundElement.textContent = roundPeso(totalPaidBeforeRefund).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     }
                 }
                 
@@ -852,26 +909,28 @@ window.showBilling = async function (bookingID) {
                 }
                 
                 // Display Paid Amount & Balance
-                setText('totalPaid', paidAmountToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                setText('balanceAmount', balanceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('totalPaid', roundPeso(paidAmountToShow).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('balanceAmount', roundPeso(balanceToShow).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 // Total Amount handling
                 let totalAmount = grossTotal - reservationFee - discountAmount;
                 if (isCancelled) {
                     // For cancelled bookings, total amount is just the cancellation fee
                     totalAmount = penaltyAmountValue;
                 }
-                setText('totalPayment', totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('totalPayment', roundPeso(totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
                 // Calculate Total Room Charges, Total Services, and Total Penalty
                 let totalRoomCharges = 0;
                 let totalServices = 0;
                 let totalPenalty = 0;
                 
-                data.items.forEach(item => {
+                data.items.forEach((item, itemIndex) => {
                     const amount = parseFloat(item.subTotal) || 0;
                     const description = (item.description || '').toLowerCase();
                     const isPenalty = item.status === 'penalty';
-                    const isRoom = description.includes('room') || description.includes('bedroom') || description.includes('room charge');
+                    // the FIRST line is the room (of a group's main booking: every room, named only by its type); "... · Room 408" is another room's service
+                    const taggedLine = /·\s*room\s+\S+\s*$/i.test(String(item.description || ''));
+                    const isRoom = itemIndex === 0 || (!taggedLine && (description.includes('room') || description.includes('bedroom') || description.includes('room charge')));
                     
                     // Check if it's a penalty or cancellation fee
                     if (description.includes('penalty') || description.includes('cancellation fee') || isPenalty) {
@@ -896,8 +955,8 @@ window.showBilling = async function (bookingID) {
                 }
                 
                 // Update Total Room Charges and Total Services
-                setText('totalRoomCharges', totalRoomCharges.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                setText('totalServices', totalServices.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('totalRoomCharges', roundPeso(totalRoomCharges).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('totalServices', roundPeso(totalServices).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 
                 // Update Total Penalty (show/hide based on amount)
                 const penaltyRow = document.getElementById('totalPenaltyRow');
@@ -905,7 +964,7 @@ window.showBilling = async function (bookingID) {
                 if (penaltyRow && penaltyElement) {
                     if (totalPenalty > 0) {
                         penaltyRow.style.display = 'flex';
-                        penaltyElement.textContent = totalPenalty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        penaltyElement.textContent = roundPeso(totalPenalty).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     } else {
                         penaltyRow.style.display = 'none';
                     }
@@ -918,7 +977,7 @@ window.showBilling = async function (bookingID) {
                     if (row && amt) {
                         if (reservationFee > 0) {
                             row.style.display = 'block';
-                            amt.textContent = reservationFee.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                            amt.textContent = roundPeso(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 });
                             amt.style.textAlign = 'right';
                             amt.style.display = 'inline-block';
                             amt.style.width = 'auto';
@@ -937,7 +996,7 @@ window.showBilling = async function (bookingID) {
                     if (row && amt) {
                         if (discountAmount > 0) {
                             row.style.display = 'block';
-                            amt.textContent = discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                            amt.textContent = roundPeso(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 });
                             amt.style.textAlign = 'right';
                             amt.style.display = 'inline-block';
                             amt.style.width = 'auto';

@@ -1,5 +1,6 @@
 // Load environment variables FIRST, before any other imports
 require('dotenv').config();
+require('./utils/moneyRound');   // whole-peso amounts in every receipt / voucher / PDF rendered by the server
 
 const express = require('express');
 const expressLayouts = require('express-ejs-layouts');

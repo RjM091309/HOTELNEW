@@ -4423,7 +4423,9 @@ class BookingModel {
         
         // Determine payment amount
         const paymentAmountToUse = paymentAmount !== null && paymentAmount !== undefined ? paymentAmount : netBalance;
+        // the screens show whole pesos: paying the rounded amount settles a balance that is less than 1 peso away (31,100 for 31,100.02)
         let remainingPayment = Math.min(paymentAmountToUse, netBalance);
+        if (paymentAmount != null && netBalance - remainingPayment > 0 && netBalance - remainingPayment < 1) remainingPayment = netBalance;
         
         // Step 3: Process payments in priority order (Room -> Extensions -> Services)
         

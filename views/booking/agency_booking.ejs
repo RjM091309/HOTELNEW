@@ -785,29 +785,8 @@ function downloadVoucherFromModal() {
 
 // Function to download voucher
 function downloadVoucher(bookingID) {
-    Swal.fire({
-        title: 'Generating Voucher...',
-        text: 'Please wait while we prepare your voucher.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = '/booking/voucher/' + bookingID + '?download=1';
-    document.body.appendChild(iframe);
-    
-    setTimeout(() => {
-        document.body.removeChild(iframe);
-        Swal.fire({
-            icon: 'success',
-            title: 'PDF Voucher Downloaded!',
-            text: 'Your voucher has been downloaded as PDF automatically.',
-            confirmButtonText: 'OK'
-        });
-    }, 2000);
+    // the voucher opens in the preview card (Download / Print there)
+    window.PdfPreview.openUrl('/booking/voucher/' + bookingID, 'Voucher');
 }
 
 // OPEN CANCEL BOOKING MODAL

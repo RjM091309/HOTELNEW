@@ -74,6 +74,7 @@ router.post('/remove-group-services', BookingController.removeGroupServices);
 router.post('/process-payment', BookingController.processPayment);
 router.post('/pay-service', BookingController.payService);
 router.post('/pay-room', BookingController.payRoom);
+router.post('/receipt-pdf', require('express').text({ type: 'text/plain', limit: '3mb' }), BookingController.receiptPdf);
 router.get('/room-bill/:id', BookingController.roomBill);
 router.get('/service-balance/:id', BookingController.serviceBalance);
 // Discount management

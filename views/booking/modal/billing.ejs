@@ -239,7 +239,7 @@
 		} else {
 			window.__billingJsRequested = true;
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/billing.js?v=receipt-credit-1';
+			bookingBillingScript.src = '/js/booking/billing.js?v=receipt-credit-4';
 			bookingBillingScript.onload = function() {
 				if (window.embedHotelLogo) {
 					window.embedHotelLogo('#modal-billing .hotel-logo');
@@ -299,6 +299,7 @@
 					
 					if (billingTable) {
 						const rows = billingTable.querySelectorAll('tr');
+						let firstLineSeen = false;
 						rows.forEach(row => {
 							// Check if row has enough cells before accessing
 							if (!row.cells || row.cells.length < 6) {
@@ -321,13 +322,18 @@
 								return;
 							}
 							
-							if (description.toLowerCase().includes('room') || description.toLowerCase().includes('bedroom')) {
-								roomAmount += subTotal;
-							} else if (description.toLowerCase().includes('extension') || description.toLowerCase().includes('extend')) {
+							// The FIRST line of the receipt is the room (of a group's main booking: every room of the group, named only by its type, e.g. "1 Queen VIP").
+							// A line tagged "· Room 408" is another room's service / extension: the word "room" in that tag does not make it a room charge.
+							const dl = description.toLowerCase();
+							const tagged = /·\s*room\s+\S+\s*$/i.test(description);
+							if (dl.includes('extension') || dl.includes('extend')) {
 								extensionAmount += subTotal;
+							} else if (!firstLineSeen || (!tagged && (dl.includes('room') || dl.includes('bedroom')))) {
+								roomAmount += subTotal;
 							} else {
 								serviceAmount += subTotal;
 							}
+							firstLineSeen = true;
 						});
 					}
 					

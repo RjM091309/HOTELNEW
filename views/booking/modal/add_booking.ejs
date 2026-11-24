@@ -130,7 +130,7 @@
                             <div class="form-group">
                                 <label class="form-label">Discount %</label>
                                 <div class="input-group">
-                                    <input type="number" class="form-control" id="percentageRateInput" min="0" max="100" step="0.01" placeholder="e.g. 7" autocomplete="off">
+                                    <input type="number" class="form-control" id="percentageRateInput" min="0" max="100" step="1" placeholder="e.g. 7" autocomplete="off">
                                     <span class="input-group-text">%</span>
                                 </div>
                                 <small class="text-muted d-block" style="font-size: 11px; margin-top: 2px;">Off Walk-in rate</small>
@@ -295,12 +295,12 @@
                                           <span style="font-size: 12px;">Adult</span>
                                           <input type="number" class="form-control" id="extraBfSingleAdultQty" min="0" step="1" value="0" style="height: 32px; padding: 2px 6px; text-align: center;" title="How many of the extras are adults (the rest are kids)">
                                           <span style="font-size: 12px; white-space: nowrap;">x &#8369;</span>
-                                          <input type="number" class="form-control" id="extraBfSinglePrice" name="extraBfSinglePrice" min="0" step="0.01" value="600" style="height: 32px; padding: 2px 8px;" title="Price of one extra adult breakfast">
+                                          <input type="number" class="form-control" id="extraBfSinglePrice" name="extraBfSinglePrice" min="0" step="1" value="600" style="height: 32px; padding: 2px 8px;" title="Price of one extra adult breakfast">
 
                                           <span style="font-size: 12px;">Kid</span>
                                           <input type="number" class="form-control" id="extraBfSingleKidQty" name="extraBfSingleKidQty" min="0" step="1" value="0" style="height: 32px; padding: 2px 6px; text-align: center;" title="How many of the extras are kids">
                                           <span style="font-size: 12px; white-space: nowrap;">x &#8369;</span>
-                                          <input type="number" class="form-control" id="extraBfSingleKidPrice" name="extraBfSingleKidPrice" min="0" step="0.01" value="300" style="height: 32px; padding: 2px 8px;" title="Price of one extra kid breakfast">
+                                          <input type="number" class="form-control" id="extraBfSingleKidPrice" name="extraBfSingleKidPrice" min="0" step="1" value="300" style="height: 32px; padding: 2px 8px;" title="Price of one extra kid breakfast">
                                         </div>
                                       </div>
 
@@ -345,7 +345,7 @@
                                     <div id="extraBedWrapper" class="mt-1" style="display: none;">
                                       <div class="d-flex gap-2 align-items-center">
                                         <input type="number" class="form-control" id="extraBedQty" name="extraBedQty" min="1" max="9" step="1" value="1" placeholder="Qty" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="extraBedPrice" name="extraBedPrice" min="0" step="0.01" value="1500" placeholder="Price per bed">
+                                        <input type="number" class="form-control" id="extraBedPrice" name="extraBedPrice" min="0" step="1" value="1500" placeholder="Price per bed">
                                       </div>
                                     </div>
                                   </div>
@@ -377,7 +377,7 @@
                             <div id="divpaidAmount" class="col-lg-3">
                                 <div class="form-group">
                                     <label class="form-label">Paid Amount</label>
-                                    <input class="form-control" type="number" id="paidAmount" name="paidAmount" placeholder="Enter paid amount" step="0.01" min="0" max="999999" value="0" onblur="formatPaidAmount(this)">
+                                    <input class="form-control" type="number" id="paidAmount" name="paidAmount" placeholder="Enter paid amount" step="1" min="0" max="999999" value="0" onblur="formatPaidAmount(this)">
                                 </div>
                             </div>
                             
@@ -438,7 +438,7 @@
                                   <div class="col-lg-3">
                                     <div class="form-group">
                                       <label class="form-label">Late Checkout Fee</label>
-                                      <input class="form-control" type="number" id="lateCheckoutFeeInput" name="lateCheckoutFeeInput" placeholder="0.00" step="0.01" min="0">
+                                      <input class="form-control" type="number" id="lateCheckoutFeeInput" name="lateCheckoutFeeInput" placeholder="0.00" step="1" min="0">
                                     </div>
                                   </div>
                                 </div>
@@ -492,7 +492,7 @@
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
                                       <button type="button" class="btn btn-sm btn-outline-success discount-mode-btn" id="addBookingDiscountPerNightBtn">Per Night</button>
                                       <button type="button" class="btn btn-sm btn-outline-primary discount-mode-btn" id="addBookingDiscountManualBtn">Manual Price</button>
-                                      <input type="number" min="0" step="0.01" id="addBookingDiscountInput" class="form-control form-control-sm" placeholder="Amount / night" data-mode="pernight" style="max-width: 140px; display: none;">
+                                      <input type="number" min="0" step="1" id="addBookingDiscountInput" class="form-control form-control-sm" placeholder="Amount / night" data-mode="pernight" style="max-width: 140px; display: none;">
                                       <input type="text" id="addBookingDiscountRemarksInput" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width: 260px; display: none;">
                                       <button type="button" class="btn btn-sm btn-success" id="addBookingDiscountApplyBtn" style="display: none;">Apply</button>
                                       <button type="button" class="btn btn-sm btn-outline-danger" id="addBookingDiscountRemoveBtn" style="display: none;">

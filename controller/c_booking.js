@@ -1570,6 +1570,36 @@ class BookingController {
     }
   }
 
+  // POST /booking/receipt-pdf?name=... (body: the receipt's HTML as text/plain) -> the receipt as a PDF file (the "Save as PDF" of the receipt preview).
+  // The page is rendered with scripts OFF and may only load files from this server (or inline data), so it cannot be used to reach anything else.
+  static async receiptPdf(req, res) {
+    let browser = null;
+    try {
+      const html = typeof req.body === 'string' ? req.body : '';
+      if (!html || html.length < 50) return res.status(400).json({ success: false, message: 'Nothing to save.' });
+      const { chromium } = require('playwright');
+      const origin = `${req.protocol}://${req.get('host')}`;
+      browser = await chromium.launch();
+      const context = await browser.newContext({ javaScriptEnabled: false });
+      const page = await context.newPage();
+      await page.route('**/*', (route) => {
+        const u = route.request().url();
+        if (u.startsWith(origin + '/') || u.startsWith('data:') || u.startsWith('about:')) return route.continue();
+        return route.abort();
+      });
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '3mm', bottom: '3mm', left: '3mm', right: '3mm' }, preferCSSPageSize: true });
+      const name = String(req.query.name || 'Billing Receipt').replace(/[^\w\- #.]/g, '').slice(0, 80) || 'Billing Receipt';
+      res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${name}.pdf"`, 'Content-Length': pdf.length.toString() });
+      res.send(pdf);
+    } catch (error) {
+      console.error('Error making the receipt PDF:', error);
+      res.status(500).json({ success: false, message: 'Could not make the PDF.' });
+    } finally {
+      if (browser) { try { await browser.close(); } catch (e) { /* closed */ } }
+    }
+  }
+
   // GET /booking/room-bill/:id - the bill of ONE room of a group that shares one bill (and the group's, for the main room)
   static async roomBill(req, res) {
     try {

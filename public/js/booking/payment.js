@@ -1,3 +1,7 @@
+// Money is shown in whole pesos (.00): a fraction such as 4,766.67 x 6 = 28,600.02 is rounded off (the total is rounded, not each part)
+var roundPeso = window.roundPeso || function (n) { var v = Number(n); return Number.isFinite(v) ? Math.round(v) : 0; };
+window.roundPeso = roundPeso;
+
 $(document).ready(function () {
     // Initialize enhanced payment modal functionality
     initializePaymentModal();
@@ -90,11 +94,11 @@ function initializePaymentModal() {
             // don't get flagged as "exceeding" a total displayed as 1235.00)
             if (Math.round(amount * 100) > Math.round(totalAmount * 100)) {
                 // Reset to total amount if exceeded
-                this.value = totalAmount;
+                this.value = Math.round(Number(totalAmount) || 0);
                 const adjustedAmount = totalAmount;
                 
                 // Show error message
-                showPaymentStatus('error', `Amount cannot exceed ₱${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
+                showPaymentStatus('error', `Amount cannot exceed ₱${roundPeso(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2})}`);
                 
                 // Update hidden field with adjusted amount
                 const hiddenPaymentAmount = document.getElementById('paymentAmount');
@@ -123,7 +127,7 @@ function initializePaymentModal() {
             if (amount < totalAmount) {
                 const remaining = totalAmount - amount;
                 if (remainingBalanceDisplay) {
-                    remainingBalanceDisplay.textContent = remaining.toLocaleString('en-US', {minimumFractionDigits: 2});
+                    remainingBalanceDisplay.textContent = roundPeso(remaining).toLocaleString('en-US', { minimumFractionDigits: 2});
                 }
                 if (balanceRow) {
                     balanceRow.style.display = 'flex';
@@ -448,7 +452,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     // Show/hide and populate room charges
     if (breakdown.roomAmount && breakdown.roomAmount > 0) {
         if (roomRow) roomRow.style.display = 'flex';
-        if (roomAmount) roomAmount.textContent = breakdown.roomAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (roomAmount) roomAmount.textContent = roundPeso(breakdown.roomAmount).toLocaleString('en-US', { minimumFractionDigits: 2});
     } else {
         if (roomRow) roomRow.style.display = 'none';
     }
@@ -456,7 +460,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     // Show/hide and populate extensions
     if (breakdown.extensionAmount && breakdown.extensionAmount > 0) {
         if (extensionRow) extensionRow.style.display = 'flex';
-        if (extensionAmount) extensionAmount.textContent = breakdown.extensionAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (extensionAmount) extensionAmount.textContent = roundPeso(breakdown.extensionAmount).toLocaleString('en-US', { minimumFractionDigits: 2});
     } else {
         if (extensionRow) extensionRow.style.display = 'none';
     }
@@ -464,7 +468,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     // Show/hide and populate services
     if (breakdown.serviceAmount && breakdown.serviceAmount > 0) {
         if (serviceRow) serviceRow.style.display = 'flex';
-        if (serviceAmount) serviceAmount.textContent = breakdown.serviceAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (serviceAmount) serviceAmount.textContent = roundPeso(breakdown.serviceAmount).toLocaleString('en-US', { minimumFractionDigits: 2});
     } else {
         if (serviceRow) serviceRow.style.display = 'none';
     }
@@ -472,7 +476,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     // Show/hide and populate reservation fee
     if (breakdown.reservationFee && breakdown.reservationFee > 0) {
         if (reservationFeeRow) reservationFeeRow.style.display = 'flex';
-        if (reservationFeeAmount) reservationFeeAmount.textContent = breakdown.reservationFee.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (reservationFeeAmount) reservationFeeAmount.textContent = roundPeso(breakdown.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2});
         console.log('Reservation Fee shown:', breakdown.reservationFee);
     } else {
         if (reservationFeeRow) reservationFeeRow.style.display = 'none';
@@ -482,7 +486,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     // Show/hide and populate discount
     if (breakdown.discountAmount && breakdown.discountAmount > 0) {
         if (discountRow) discountRow.style.display = 'flex';
-        if (discountAmount) discountAmount.textContent = breakdown.discountAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (discountAmount) discountAmount.textContent = roundPeso(breakdown.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2});
         console.log('Discount shown:', breakdown.discountAmount);
     } else {
         if (discountRow) discountRow.style.display = 'none';
@@ -500,7 +504,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     
     if (subtotal > 0) {
         if (subtotalRow) subtotalRow.style.display = 'flex';
-        if (subtotalElement) subtotalElement.textContent = subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (subtotalElement) subtotalElement.textContent = roundPeso(subtotal).toLocaleString('en-US', { minimumFractionDigits: 2});
         console.log('Subtotal shown:', subtotal);
     } else {
         if (subtotalRow) subtotalRow.style.display = 'none';
@@ -510,7 +514,7 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     // Show/hide and populate amount paid
     if (breakdown.amountPaid && breakdown.amountPaid > 0) {
         if (amountPaidRow) amountPaidRow.style.display = 'flex';
-        if (amountPaidElement) amountPaidElement.textContent = breakdown.amountPaid.toLocaleString('en-US', {minimumFractionDigits: 2});
+        if (amountPaidElement) amountPaidElement.textContent = roundPeso(breakdown.amountPaid).toLocaleString('en-US', { minimumFractionDigits: 2});
         console.log('Amount Paid shown:', breakdown.amountPaid);
     } else {
         if (amountPaidRow) amountPaidRow.style.display = 'none';
@@ -519,13 +523,13 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     
     // Update total amount to pay
     if (paymentTotalAmountElement) {
-        const formattedAmount = totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        const formattedAmount = roundPeso(totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2});
         paymentTotalAmountElement.textContent = formattedAmount;
     }
     
     // Update input field
     if (paymentAmountInputElement) {
-        paymentAmountInputElement.value = totalAmount;
+        paymentAmountInputElement.value = Math.round(Number(totalAmount) || 0);
     }
 }
 
@@ -673,7 +677,7 @@ $('#confirmPaymentButton').on('click', async function () {
             } else {
                 const totalAmountEl = document.getElementById('paymentTotalAmount');
                 if (totalAmountEl) {
-                    totalAmountEl.textContent = freshBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                    totalAmountEl.textContent = roundPeso(freshBalance).toLocaleString('en-US', { minimumFractionDigits: 2 });
                 }
             }
 
@@ -756,7 +760,7 @@ $('#confirmPaymentButton').on('click', async function () {
         return;
     }
 
-    const formattedAmount = numericAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formattedAmount = roundPeso(numericAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Show confirmation dialog
     Swal.fire({
