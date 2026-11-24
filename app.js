@@ -157,6 +157,15 @@ app.use((req, res, next) => {
     next();
 });
 
+// Private system: tell search engines not to index or follow anything
+app.use((req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    next();
+});
+app.get('/robots.txt', (req, res) => {
+    res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { cacheControl: false }));
 
 // Debug middleware to log requests
