@@ -91,7 +91,7 @@ async function roomBill(bookingId) {
       extension: { total: o.extTotals.total, paid: o.extTotals.paid, remaining: Math.max(0, r2(o.extTotals.total - o.extTotals.paid)) },
       services: { total: o.svcTotals.total, paid: o.svcTotals.paid, remaining: Math.max(0, r2(o.svcTotals.total - o.svcTotals.paid)) },
       penalty: { total: o.penTotals.total, paid: o.penTotals.paid, remaining: Math.max(0, r2(o.penTotals.total - o.penTotals.paid)) },
-      total, paid, balance: Math.max(0, r2(total - paid))
+      total, paid, balance: (total - paid) < 1 ? 0 : Math.max(0, r2(total - paid))
     });
   }
   const own = per.find((x) => x.id === id);

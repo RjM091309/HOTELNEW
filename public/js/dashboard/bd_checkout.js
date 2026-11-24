@@ -45,7 +45,7 @@
         const backFor = (k) => r2(paid - (totalFor(k) - resFee));
         return {
             early, mode, unusedValue, roomStay, extStay, services, resFee, discount, discountFull, penalty, kept, paid, total, balance,
-            owes: balance > 0.005, refund: balance < -0.005, amount: Math.abs(balance),
+            owes: balance >= 1, refund: balance < -0.005, amount: Math.abs(balance),
             backFor
         };
     }
@@ -251,7 +251,7 @@
         // Group with one shared bill: whatever the group still owes has to be settled (or left as credit) before a room leaves.
         // The group's balance follows the choice made here: nights not stayed that are released (or not kept) come off it.
         const gBalOf = (c) => (grouped && master.isMain)
-            ? Math.max(0, r2((Number(master.balance) || 0) - (c.unusedValue - c.kept) + (c.discountFull - c.discount)))
+            ? (() => { const b = Math.max(0, r2((Number(master.balance) || 0) - (c.unusedValue - c.kept) + (c.discountFull - c.discount))); return b < 1 ? 0 : b; })()   // under one peso = settled
             : 0;
         const gOwesOf = (c) => gBalOf(c) > 0.005;
         const methodHtml = () => `<div class="bdco-field"><label for="bdco-method">Payment method</label>

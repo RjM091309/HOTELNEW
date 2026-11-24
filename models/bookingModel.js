@@ -1119,10 +1119,10 @@ class BookingModel {
     const ids = Array.isArray(bookingIds) ? bookingIds : [bookingIds];
 
     // Server-chosen literal SQL expressions (never user input) for the effective checkout moment.
-    const useScheduled = checkoutDateMode === 'scheduled';
-    // COALESCE guards a missing schedule; LEAST(..., NOW()) makes a future schedule impossible to record.
-    const checkOutTsSql = useScheduled ? 'LEAST(COALESCE(CHECK_OUT_DATE, NOW()), NOW())' : 'NOW()';
-    const effDateExpr = useScheduled ? 'DATE(LEAST(COALESCE(b.CHECK_OUT_DATE, NOW()), NOW()))' : 'DATE(NOW())';
+    // There is no date choice any more: a booking that is checked out after its scheduled date (overdue) is always recorded on its
+    // own scheduled check-out date, so its bar never stretches over the bookings that follow. On time or early -> now.
+    const checkOutTsSql = 'IF(CHECK_OUT_DATE IS NOT NULL AND DATE(CHECK_OUT_DATE) < CURDATE(), CHECK_OUT_DATE, NOW())';
+    const effDateExpr = 'DATE(IF(b.CHECK_OUT_DATE IS NOT NULL AND DATE(b.CHECK_OUT_DATE) < CURDATE(), b.CHECK_OUT_DATE, NOW()))';
 
     // Guard: every booking ID touched below must belong to the current
     // property - everything downstream in this transaction reuses these
@@ -3157,7 +3157,7 @@ class BookingModel {
       total,
       net,
       paid,
-      balance: Math.max(0, net - paid)
+      balance: (net - paid) < 1 ? 0 : Math.max(0, net - paid)   // less than one peso left is settled (everything is shown and paid in whole pesos)
     };
   }
 

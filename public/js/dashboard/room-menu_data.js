@@ -6310,7 +6310,8 @@ function buildCheckoutIntroHtml() {
 // scheduled-date option is pre-selected so a forgotten checkout does not stretch the
 // calendar bar over later bookings; otherwise "today" is pre-selected.
 function buildCheckoutDateChoiceHtml(dateChoice) {
-    if (!dateChoice) return '';
+    // The choice was removed: an overdue booking is always checked out on its own scheduled date (decided by the server).
+    return '';
 
     // A booking that is due today is checked out straight away: the date choice is only for an early / overdue checkout.
     const t = new Date();
@@ -7225,6 +7226,8 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
     const finishSuccess = (resp) => {
         Swal.close();
         toastSuccess('Checkout', resp.message || 'Checkout completed successfully.');
+        // inside the Dashboard's frame: tell the Dashboard first, so its (invisible) layer over the building is removed
+        try { if (window.parent !== window) window.parent.postMessage({ type: 'bd-closed' }, window.location.origin); } catch (e) { /* ignore */ }
         setTimeout(() => { location.reload(); }, 600);
     };
 
