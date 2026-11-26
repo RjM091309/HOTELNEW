@@ -363,7 +363,7 @@
     var o = D.overview, r = o.reservation, h = o.housekeeping;
     return '<div class="fd-sec">Reservation</div><div class="fd-tiles">' +
       tile('Occupied', 'fa-bed', pad(r.occupied), 'acc', 'of ' + D.totalRooms + ' rooms') +
-      tile('Check in', 'fa-sign-in-alt', pad(r.checkIn.total), 'good', r.checkIn.done ? r.checkIn.done + ' already in' : 'still to arrive', '/calendar?focus=arrivals') +
+      tile('Arrival', 'fa-sign-in-alt', pad(r.checkIn.total), 'good', r.checkIn.done ? r.checkIn.done + ' already in' : 'still to arrive', '/calendar?focus=arrivals') +
       tile('Check out', 'fa-sign-out-alt', pad(r.checkOut.total), 'info', r.checkOut.done ? r.checkOut.done + ' already out' : 'still to leave', '/calendar?focus=departures') + '</div>' +
       '<div class="fd-sec">Housekeeping</div><div class="fd-tiles">' +
       tile('Available', 'fa-check-circle', pad(h.available), 'good', 'ready to sell') +
@@ -499,7 +499,7 @@
       var lateIn = (D.building || []).filter(function (x) { return x.arriving && x.arrivingLate; }).length;
       var freeN = (D.building || []).filter(function (x) { return String(x.status) === '1' && !x.arriving; }).length;   // clean, nobody in it and nobody arriving
       side = tile('Occupied', 'fa-bed', pad(c.occupied), 'acc', 'of ' + (D.building || []).length + ' rooms') +
-        tile('Check in', 'fa-sign-in-alt', pad(c.arriving), 'good', c.arriving ? ((c.arriving - lateIn) + ' regular &middot; ' + lateIn + ' late' + (c.btb ? ' &middot; ' + c.btb + ' back-to-back' : '')) : 'none arriving') +
+        tile('Arrival', 'fa-sign-in-alt', pad(c.arriving), 'good', c.arriving ? ((c.arriving - lateIn) + ' regular &middot; ' + lateIn + ' late' + (c.btb ? ' &middot; ' + c.btb + ' back-to-back' : '')) : 'none arriving') +
         tile('Check out', 'fa-sign-out-alt', pad(c.leaving), 'info', c.leaving ? ((c.leaving - c.late) + ' regular &middot; ' + c.late + ' late') : 'none leaving') +
         tile('Back-to-back', 'fa-exchange-alt', pad(c.btb), 'warn', c.btb ? 'late check-out then late check-in' : 'none') +
         tile('Available', 'fa-check-circle', pad(freeN), 'good', 'free all day, no arrival') +
@@ -515,7 +515,7 @@
       note = warn;
     } else {
       side = tile('Occupied', 'fa-bed', pad(r.occupied), 'acc', 'of ' + D.totalRooms + ' rooms') +
-        tile('Check in', 'fa-sign-in-alt', pad(r.checkIn.total), 'good', r.checkIn.done ? r.checkIn.done + ' already in' : 'still to arrive', '/calendar?focus=arrivals') +
+        tile('Arrival', 'fa-sign-in-alt', pad(r.checkIn.total), 'good', r.checkIn.done ? r.checkIn.done + ' already in' : 'still to arrive', '/calendar?focus=arrivals') +
         tile('Check out', 'fa-sign-out-alt', pad(r.checkOut.total), 'info', r.checkOut.done ? r.checkOut.done + ' already out' : 'still to leave', '/calendar?focus=departures') +
         tile('Available', 'fa-check-circle', pad(h.available), 'good', 'ready to sell') +
         tile('Dirty', 'fa-broom', pad(h.dirty), 'warn', h.dirty ? 'to clean' : 'all clean', h.dirty ? '/calendar?cleaning=all' : '') +
