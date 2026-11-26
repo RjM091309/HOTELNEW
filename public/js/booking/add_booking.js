@@ -1553,7 +1553,7 @@ $(document).ready(function () {
 
             // Show individual booking fields again
             $('#divaddFloor, #divaddroom, #divroom_type, #divprice, #divbedCount, #divtxtFullNameAdd, #divtxtNumber, #divtxtNationality').show();
-            $('#txtFullNameAdd, #nationality').prop('required', true);
+            $('#txtFullNameAdd').prop('required', true);
 
             $('#divpaymentStatus, #divtxtCheckInStatus, #divselectBookingRoute, #divtxtNationality')
                 .removeClass('col-lg-4').addClass('col-lg-3'); // Reset to original size

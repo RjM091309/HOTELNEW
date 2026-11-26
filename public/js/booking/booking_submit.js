@@ -202,11 +202,6 @@ $(document).ready(function () {
         return;
       }
 
-      if (!nationality) {
-        Swal.fire({ icon: 'error', title: 'Nationality Required', text: 'Please select the guest nationality.' });
-        return;
-      }
-
       if (includePickup && (!flightNumber || !flightNumber.trim())) {
         Swal.fire({
           icon: 'error',

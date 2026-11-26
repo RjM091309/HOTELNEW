@@ -296,7 +296,7 @@
 						<% } %>
 						<% if (user && user.PERMISSIONS == 1) { %>
 						<li class="nav-item">
-							<a href="#" id="navDeleteTestData" class="nav-link">
+							<a href="#" id="navDeleteTestData" class="nav-link" data-property-id="<%= (typeof currentProperty !== 'undefined' && currentProperty) ? currentProperty.IDNo : '' %>" data-property-name="<%= (typeof propertyDisplayName !== 'undefined') ? propertyDisplayName : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Delete Data</span>
 							</a>

@@ -257,14 +257,14 @@
 
                             <div id="divtxtNationality" class="col-lg-3">
                                 <div class="form-group">
-                                    <label class="form-label">Nationality</label>
-                                    <select class="form-select" id="nationality" name="nationality" required>
-                                        <option value="" disabled selected>Select Nationality</option>
-                                        <option value="Filipino">Filipino</option>
-                                        <option value="Korean">Korean</option>
-                                        <option value="Chinese">Chinese</option>
-                                        <option value="American">American</option>
-                                    </select>
+                                    <label class="form-label">Nationality <small class="text-muted">(optional)</small></label>
+                                    <input class="form-control" type="text" id="nationality" name="nationality" list="nationalityList" maxlength="50" autocomplete="off" placeholder="Select or type nationality">
+                                    <datalist id="nationalityList">
+                                        <option value="Filipino"></option>
+                                        <option value="Korean"></option>
+                                        <option value="Chinese"></option>
+                                        <option value="American"></option>
+                                    </datalist>
                                 </div>
                             </div>
 
@@ -590,7 +590,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=extra-bf-6';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=nationality-1';
 			document.body.appendChild(bookingBillingScript);
 		};
 
@@ -600,7 +600,7 @@
 		document.body.appendChild(maintenanceScript);
 		maintenanceScript.onload = function() {
 			var submitScript = document.createElement('script');
-			submitScript.src = '/js/booking/booking_submit.js?v=extra-bed-1';
+			submitScript.src = '/js/booking/booking_submit.js?v=nationality-1';
 			document.body.appendChild(submitScript);
 		};
 

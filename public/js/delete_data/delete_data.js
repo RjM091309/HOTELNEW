@@ -2,10 +2,14 @@ $(document).ready(function () {
   $('#navDeleteTestData').on('click', function (e) {
     e.preventDefault();
 
+    // only the property this page is open on is deleted: say its name, and send its id so the server can check it
+    const propertyId = $(this).attr('data-property-id');
+    const propertyName = $(this).attr('data-property-name') || 'this property';
+    const safeName = $('<div>').text(propertyName).html();
+
     Swal.fire({
       title: 'Delete Data?',
-      html: `Are you sure you want to delete data?
-      `,
+      html: `Are you sure you want to delete the data of <b>${safeName}</b>?<br>The other properties are not affected.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -20,7 +24,7 @@ $(document).ready(function () {
 
       Swal.fire({
         title: 'Final Confirmation',
-        text: 'Are you absolutely sure you want to delete data?',
+        html: `All bookings, payments and expenses of <b>${safeName}</b> will be permanently deleted. This cannot be undone.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -46,6 +50,7 @@ $(document).ready(function () {
         $.ajax({
           url: '/delete-data/purge',
           type: 'POST',
+          data: { propertyId: propertyId },
           success: function (response) {
             if (response.success) {
               Swal.fire({
