@@ -349,9 +349,71 @@ function currentDiscountCat() {
     return RATE_DISCOUNT_PCT[t] ? t : null;
 }
 
+// Rate / Per Night is always open to edit: the default comes from Room Rates, and a price staff type replaces it
+// (the same price for every night). It is dropped when something that sets the price changes (room, rate, who pays,
+// percent, breakfast tier, guests, bed type, contracted); changing only the dates keeps it.
+let singlePriceOverride = null;   // { value, key }
+const SINGLE_EDITED_PRICE_NOTE = 'Edited price, same for every night. Clear the box to use the default again.';
+
+function singlePriceKey() {
+    const poolVilla = typeof isPoolVillaActive === 'function' && isPoolVillaActive();   // its rate has no breakfast tier
+    const bfPersons = !poolVilla && $('#includeBreakfast').is(':checked')
+        ? Math.min(2, (parseInt($('#breakfastAdultQty').val(), 10) || 0) + (parseInt($('#breakfastKidQty').val(), 10) || 0))
+        : 0;
+    return [
+        $('#addroom').val() || '',
+        $('#bookingRoute').val() || '',
+        $('input[name="agencyPayer"]:checked').val() || '',
+        $('#percentageRateInput').val() || '',
+        bfPersons,
+        poolVilla ? ($('#maxOccupants').val() || '') : '',
+        $('#directReservationFlag').val() === 'true' ? (window.selectedBedCount || '') : '',
+        $('#includeContractedRate').is(':checked') ? 1 : 0
+    ].join('|');
+}
+
+function activeSinglePrice() {
+    if (singlePriceOverride && singlePriceOverride.key !== singlePriceKey()) singlePriceOverride = null;
+    return singlePriceOverride ? singlePriceOverride.value : null;
+}
+
+$(document)
+    .off('.priceOverride')
+    .on('input.priceOverride', '#price', function () {
+        const value = parseFloat(String($(this).val() || '').replace(/[^\d.]/g, ''));
+        singlePriceOverride = Number.isFinite(value) ? { value, key: singlePriceKey() } : null;
+        if (singlePriceOverride) $('#priceRateNote').text(SINGLE_EDITED_PRICE_NOTE);
+        computeTotal();
+    })
+    .on('change.priceOverride', '#price', function () {
+        // an emptied box goes back to the default price
+        if (String($(this).val() || '').trim() !== '') return;
+        singlePriceOverride = null;
+        if (typeof window._updateSeasonalPrice === 'function') window._updateSeasonalPrice();
+        computeTotal();
+    });
+document.addEventListener('hidden.bs.modal', (e) => {
+    if (e.target && e.target.id === 'modal-addbooking') singlePriceOverride = null;   // never carried into the next booking
+});
+
 function getRoomRateDetails() {
     const nights = getStayNights();
     const breakdown = countNightBreakdown();
+
+    const typed = activeSinglePrice();
+    if (typed !== null) {
+        return {
+            roomRate: typed,
+            roomCharges: typed * nights,
+            nights,
+            breakdown,
+            weekendEnabled: false,
+            seasonCrossing: false,
+            weekdayRate: typed,
+            weekendRate: typed,
+            edited: true
+        };
+    }
 
     // Each night bills at its own room_rates amount: Mon-Thu = weekday rate,
     // Fri-Sun = weekend rate, AND its own season's rate (Lean vs Peak).
@@ -844,7 +906,8 @@ function computeTotal() {
     // before anything below reads roomRate/roomCharges so the reduction
     // flows into the on-screen total AND the #baseprice/#price fields that
     // get submitted as this booking's per-night rate.
-    if ($('#includeContractedRate').is(':checked')) {
+    // (a price staff typed is already the final one)
+    if ($('#includeContractedRate').is(':checked') && !rateDetails.edited) {
         rateDetails.roomRate = Math.max(0, rateDetails.roomRate - CONTRACTED_RATE_PER_NIGHT);
         rateDetails.roomCharges = rateDetails.roomRate * rateDetails.nights;
     }
@@ -855,7 +918,8 @@ function computeTotal() {
     // breakdown UI isn't shown (that branch below only updates these two
     // fields when weekendEnabled is true).
     $('#baseprice').val(roomRate.toFixed(2));
-    $('#price').val(Math.round(roomRate).toLocaleString('en-US'));
+    const typingPrice = document.activeElement && document.activeElement.id === 'price';   // never rewrite the box while staff type in it
+    if (!typingPrice) $('#price').val(Math.round(roomRate).toLocaleString('en-US'));
 
     const bd = rateDetails.breakdown || { weekday: 0, weekend: 0 };
     const peso = (n) => '₱' + Math.round(n).toLocaleString('en-US');
@@ -867,7 +931,7 @@ function computeTotal() {
             // Different amounts per night - store the blended average so the
             // server's price x nights matches this breakdown.
             $('#baseprice').val(roomRate.toFixed(2));
-            $('#price').val(Math.round(roomRate).toLocaleString('en-US'));
+            if (!typingPrice) $('#price').val(Math.round(roomRate).toLocaleString('en-US'));
         }
         const wd = rateDetails.weekdayRate;
         const we = rateDetails.weekendRate;
@@ -876,7 +940,7 @@ function computeTotal() {
         const wiWe = parseMoney($('#walkinWeekendRate').val()) || we;
         const dWd = Math.max(0, wiWd - wd);   // per-night discount, weekday
         const dWe = Math.max(0, wiWe - we);   // per-night discount, weekend
-        const hasDiscount = !!discCat && (dWd > 0 || dWe > 0);
+        const hasDiscount = !rateDetails.edited && !!discCat && (dWd > 0 || dWe > 0);
         const pct = hasDiscount ? RATE_DISCOUNT_PCT[discCat] : 0;
         const label = hasDiscount ? RATE_CAT_LABEL[discCat] : '';
 
@@ -1675,7 +1739,6 @@ $(document).ready(function () {
             $('#baseprice').val('');
             computeTotal();
         } else {
-            $('#price').prop('readonly', true);
             if (typeof window._updateSeasonalPrice === 'function') {
                 window._updateSeasonalPrice();
             } else {
@@ -1688,7 +1751,6 @@ $(document).ready(function () {
     $('#weekendPriceToggle').change(function () {
         if ($(this).is(':checked')) {
             $('#manualPriceToggle').prop('checked', false);
-            $('#price').prop('readonly', true);
             syncWeekendRateDefaults(true);
         } else {
             $('#weekdayRate').val('');
@@ -1934,6 +1996,10 @@ $(document).ready(function () {
                     refreshRateOptionLabels();
                     updateBreakfastNote();
                     syncLongTermStayCheckbox();
+                    if (activeSinglePrice() !== null) {   // still the same room and rate: keep what staff typed
+                        computeTotal();
+                        $('#priceRateNote').text(SINGLE_EDITED_PRICE_NOTE);
+                    }
                 }
 
                 // OTA / Channel and Manual Rate don't have their own rate
@@ -2010,7 +2076,6 @@ $(document).ready(function () {
                 }
 
                 function applyPercentagePricing() {
-                    $('#price').prop('readonly', true);
                     const pct = Math.max(0, Math.min(100, parseFloat($('#percentageRateInput').val()) || 0));
                     $('#priceRateNote').text(pct > 0 ? `${pct}% off Walk-in rate` : 'Percentage off Walk-in rate');
 
@@ -2059,7 +2124,6 @@ $(document).ready(function () {
                     const category = poolVillaCategory();
 
                     if (!Number.isInteger(guestCount) || guestCount < 1) {
-                        $('#price').prop('readonly', true);
                         $('#price').val('');
                         $('#priceRateNote').text('Enter Number of Guests to see the rate');
                         $('#price').data('base-price', 0);
@@ -2072,7 +2136,6 @@ $(document).ready(function () {
 
                     const refRate = poolVillaRateFor(refSeason, category, guestCount);
                     if (refRate === null) {
-                        $('#price').prop('readonly', true);
                         $('#price').val('');
                         const seasonLabel = refSeason === 'peak' ? 'Peak' : 'Off';
                         $('#priceRateNote').text(`No rate for ${guestCount} guests in ${seasonLabel} Season - use Manual Price`);
@@ -2083,7 +2146,6 @@ $(document).ready(function () {
                         return;
                     }
 
-                    $('#price').prop('readonly', true);
                     $('#priceRateNote').text('Auto from Pool Villa Rates');
 
                     const otherRate = poolVillaRateFor(otherSeason, category, guestCount);
@@ -2123,7 +2185,6 @@ $(document).ready(function () {
                         return;
                     }
 
-                    $('#price').prop('readonly', true);
                     const activeLongTermBand = LONG_TERM_BANDS.find((b) => b.category === longTermCategoryForNights(getStayNights()));
                     $('#priceRateNote').text(activeLongTermBand
                         ? `Long Term Stay rate (${activeLongTermBand.max === null ? activeLongTermBand.min + '+' : activeLongTermBand.min + '-' + activeLongTermBand.max} nights)`

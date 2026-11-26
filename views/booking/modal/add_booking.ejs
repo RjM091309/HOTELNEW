@@ -204,7 +204,7 @@
                             <div class="form-group">
                               <div id="singleRateWrapper">
                                 <label class="form-label">Rate / Per Night</label>
-                                <input class="form-control" type="text" id="price" name="price" readonly>
+                                <input class="form-control" type="text" id="price" name="price" inputmode="decimal" autocomplete="off" title="Default price from Room Rates. Type to change it.">
                                 <small class="text-muted d-block" id="priceRateNote" style="font-size: 11px; margin-top: 4px;">Auto from Room Rates</small>
                               </div>
                               <!-- Manual price + weekend split removed - each night bills at its own room_rates amount -->
@@ -590,7 +590,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=nationality-1';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=editable-price-1';
 			document.body.appendChild(bookingBillingScript);
 		};
 
