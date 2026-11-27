@@ -829,7 +829,7 @@ function recomputeRateSummaryTotals() {
   const bakedInBreakfastTotal = (kingQty * kingBakedInBreakfast) + (queenQty * queenBakedInBreakfast);
   const extraBreakfastTotal = extraBreakfastQty * extraBreakfastRate;
   const breakfastTotal = bakedInBreakfastTotal + extraBreakfastTotal;
-  const extraBedTotal = extraBedQty * extraBedRate;
+  const extraBedTotal = extraBedQty * extraBedRate * nights;   // per bed, per night
 
   // Opt-in (see the checkbox listener in initRateSummary) - never applied
   // automatically. Rule from the "LATE CHECK OUT" /services entry: a short

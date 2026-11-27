@@ -1393,6 +1393,33 @@ async function runPropertyMigrations() {
   }
 }
 
+// Services charged per night (extra bed): price of one for one night, the nights charged, and the nights that had
+// already passed when it was added. Old lines keep PER_NIGHT_PRICE NULL = one-time charge. See utils/perNightServices.js.
+async function runPerNightServiceMigration() {
+  if (!(await tableExists('booking_service'))) return;
+  await ensureColumn('booking_service', 'PER_NIGHT_PRICE', 'DECIMAL(12,2) NULL DEFAULT NULL');
+  await ensureColumn('booking_service', 'NIGHTS', 'INT NULL DEFAULT NULL');
+  await ensureColumn('booking_service', 'NIGHTS_OFFSET', 'INT NOT NULL DEFAULT 0');
+}
+
+// A service whose own payments cover its cost is paid. The "Pay" button of a service row used to save the payment but
+// fail to change the status; this puts those lines right (money not yet received - unsettled credit - does not count).
+async function runPaidServiceStatusRepair() {
+  if (!(await tableExists('booking_service')) || !(await tableExists('payments'))) return;
+  const result = await queryDatabasePromise(`
+    UPDATE booking_service bs
+      JOIN (
+        SELECT BOOKING_SERVICE_ID AS id, SUM(AMOUNT_PAID) AS paid
+          FROM payments
+         WHERE BOOKING_SERVICE_ID IS NOT NULL AND PAYMENT_TYPE = 'service'
+           AND NOT (LOWER(COALESCE(PAYMENT_METHOD, '')) IN ('credit', 'marker') AND SETTLED_DATE IS NULL)
+         GROUP BY BOOKING_SERVICE_ID
+      ) p ON p.id = bs.IDNo
+       SET bs.STATUS = 'paid'
+     WHERE bs.ACTIVE = 1 AND bs.STATUS <> 'paid' AND bs.TOTAL_COST > 0 AND p.paid >= bs.TOTAL_COST - 0.005`);
+  if (result && result.affectedRows) console.log(`✅ Marked ${result.affectedRows} already-paid service line(s) as paid`);
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
@@ -1410,6 +1437,12 @@ async function runStartupMigrations() {
   await runHoldPendingStatusBackfill();
   await runBookingActualTimesMigration();
   await runTransferLogUserMigration();
+  await runPerNightServiceMigration();
+  try {
+    await runPaidServiceStatusRepair();
+  } catch (error) {
+    console.error('⚠️ Paid service status repair failed (app keeps starting):', error.message);
+  }
   await runRoomRatesMigrations();
   await runRoomRateSeasonMonthsMigration();
   await runPoolVillaRatesMigration();

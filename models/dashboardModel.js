@@ -1,4 +1,5 @@
 const { pool, queryDatabase, queryDatabasePromise } = require('../config/database');
+const { syncPerNightServices } = require('../utils/perNightServices');
 const axios = require('axios');
 
 class DashboardModel {
@@ -2442,6 +2443,7 @@ class DashboardModel {
         cost,
         userId
       ]);
+      await syncPerNightServices([bookingId]);   // extra bed: the added nights
 
       // Room was fully paid but extension is unpaid — reflect partial payment on billing
       await queryDatabasePromise(

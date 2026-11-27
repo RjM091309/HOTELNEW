@@ -1202,10 +1202,7 @@ async function createDynamicRoomModalFromBookingApi(bookingId) {
     const checkOutDate = data.CHECK_OUT_DATE;
     const checkIn = new Date(checkInDate);
     const checkOut = new Date(checkOutDate);
-    const daysDiff = Math.max(
-      1,
-      Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24))
-    );
+    const daysDiff = countStayNights(checkIn, checkOut);
 
     if (!addedServicesMap[bookingId]) {
       addedServicesMap[bookingId] = [];
@@ -1266,7 +1263,7 @@ async function createDynamicRoomModalFromEvent(bookingId, event) {
   // Calculate days from check-in and check-out dates
   const checkIn = new Date(checkInDate);
   const checkOut = new Date(checkOutDate);
-  const daysDiff = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+  const daysDiff = countStayNights(checkIn, checkOut);
   
   // Initialize services map for this booking
   if (!addedServicesMap[bookingId]) {
@@ -1300,9 +1297,43 @@ async function checkRemarksExist(bookingId) {
     }
 }
 
+// The booking's remarks, listed under "Messages & reports" in the booking window (newest first).
+function showRemarksInDetails(bookingId, remarks) {
+    const box = document.getElementById(`bd-remarks-list-${bookingId}`);
+    if (!box) return;
+    box.textContent = '';
+    const add = (parent, className, text) => {
+        const el = document.createElement('span');
+        el.className = className;
+        el.textContent = text;   // typed text is shown as text, never as HTML
+        parent.appendChild(el);
+    };
+    remarks.forEach((remark) => {
+        const line = document.createElement('div');
+        line.className = 'bd-remark';
+        if (remark.CATEGORY) add(line, 'bd-remark-cat', remark.CATEGORY);
+        add(line, 'bd-remark-text', remark.REMARK_TEXT || '');
+        const who = remark.EDITDED_BY_NAME || remark.ENCODED_BY_NAME || '';
+        const when = new Date(remark.EDITDED_DT || remark.ENCODED_DT);
+        const date = isNaN(when) ? '' : when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        add(line, 'bd-remark-meta', [who, date].filter(Boolean).join(' · '));
+        box.appendChild(line);
+    });
+    box.style.display = remarks.length ? 'block' : 'none';
+}
+
 // Function to update remarks button color dynamically
 async function updateRemarksButtonColor(bookingId) {
-    const hasRemarks = await checkRemarksExist(bookingId);
+    let remarks = null;
+    try {
+        const response = await fetch(`/booking/remarks/booking/${bookingId}?_=${Date.now()}`);
+        const result = await response.json();
+        if (result.success) remarks = result.remarks || [];
+    } catch (error) {
+        console.error('Error loading remarks:', error);
+    }
+    if (remarks) showRemarksInDetails(bookingId, remarks);
+    const hasRemarks = !!(remarks && remarks.length);
     const newClass = hasRemarks ? 'btn-danger' : 'btn-info';
 
     refreshBookingTableActionButtons(bookingId, hasRemarks);
@@ -1353,7 +1384,16 @@ function refreshBookingTableActionButtons(bookingId, hasRemarks) {
     });
 }
 
-// Function to create a dynamic room modal
+// Nights of a stay = the days between the two DATES (at least 1). The clock time never adds a night: a late
+// check-out is saved as 11 PM and must not turn 2 nights into 3.
+function countStayNights(checkIn, checkOut) {
+  const from = new Date(checkIn);
+  const to = new Date(checkOut);
+  from.setHours(0, 0, 0, 0);
+  to.setHours(0, 0, 0, 0);
+  return Math.max(1, Math.round((to - from) / (1000 * 60 * 60 * 24)) || 1);
+}
+
 async function createDynamicRoomModal(bookingId, event, options) {
   let roomNumber, roomId, guestName, checkInDate, checkOutDate, daysDiff, roomType, customerType, customerLevel, totalCost, lateCheckout, bookingChannel, agencyPayer;
   let shouldDisableCheckout = false;
@@ -1453,7 +1493,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
     // Calculate days from check-in and check-out dates
     const checkIn = new Date(checkInDate);
     const checkOut = new Date(checkOutDate);
-    daysDiff = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+    daysDiff = countStayNights(checkIn, checkOut);
   }
 
   // Initialize services map for this booking
@@ -1707,7 +1747,10 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                 <div class="info-item"><label class="text-muted small mb-0">Status</label><div class="info-value" id="booking-status-summary-${bookingId}">-</div></div>
                             </div>
                             <div class="bd-messages">
-                                <span class="bd-messages-label">Messages &amp; reports</span>
+                                <div class="bd-messages-main">
+                                    <span class="bd-messages-label">Messages &amp; reports</span>
+                                    <div class="bd-remarks-list" id="bd-remarks-list-${bookingId}" style="display:none;"></div>
+                                </div>
                                 <div class="bd-messages-btns">
                                     <button class="btn btn-sm room-toolbar-btn ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')" style="transition: none; opacity: 1 !important;">
                                         <i class="fas fa-sticky-note"></i> Remarks
@@ -2596,6 +2639,14 @@ modalStyle.textContent = `
     #dynamicRoomModal_${bookingId} .bd-messages { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef0f2; }
     #dynamicRoomModal_${bookingId} .bd-messages-label { font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6c757d; }
     #dynamicRoomModal_${bookingId} .bd-messages-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    #dynamicRoomModal_${bookingId} .bd-messages-main { flex: 1 1 240px; min-width: 0; }
+    #dynamicRoomModal_${bookingId} .bd-remarks-list { max-height: 132px; overflow-y: auto; margin-top: 4px; }
+    #dynamicRoomModal_${bookingId} .bd-remark { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 3px 0; font-size: .8rem; color: #212529; }
+    #dynamicRoomModal_${bookingId} .bd-remark-cat { font-size: .65rem; font-weight: 600; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: #eef0f2; color: #495057; }
+    #dynamicRoomModal_${bookingId} .bd-remark-text { font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+    #dynamicRoomModal_${bookingId} .bd-remark-meta { font-size: .68rem; color: #8b93a7; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-remark { color: #eef1f8 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-remark-cat { background: #222838 !important; color: #dfe5f2 !important; }
     /* The global ".btn::before" shine effect (from the billing/payment modal styles) is parked at left:-100%,
        i.e. over the NEIGHBOUR button, and Complaint/Request has overflow:visible - so it caught the mouse
        meant for Remarks and the hover kept jumping between the two. Remove it here. */
@@ -4065,7 +4116,9 @@ if (isCustomService) {
         const sameId = s.SERVICE_ID === service.SERVICE_ID;
         const sameStatus = s.STATUS !== 'paid';
         const sameCost = Math.abs(parseFloat(s.SERVICE_COST) - serviceCost) < 0.01;
-        
+        // a saved extra bed line is charged per night on the server: newly added beds are sent on their own
+        if (s.ALREADY_SAVED && /extra\s*bed/i.test(s.SERVICE_NAME || '')) return false;
+
         // For custom services (SERVICE_ID = -1), also check by name
         if (service.SERVICE_ID === -1) {
             const sameName = s.SERVICE_NAME === service.SERVICE_NAME;
@@ -4143,7 +4196,9 @@ const ignoredServiceIds = [-999, -101, -102];
 roomServices.forEach(service => {
     if (service.STATUS === 'paid') return;
     if (ignoredServiceIds.includes(parseInt(service.SERVICE_ID))) return;
-    
+    // the server adds every extra bed it receives (price x nights), so a saved one is not sent again
+    if (service.ALREADY_SAVED && /extra\s*bed/i.test(service.SERVICE_NAME || '')) return;
+
     // Skip custom services - they will be processed separately
     if (service.SERVICE_ID === -1 || service.IS_CUSTOM) return;
     
@@ -4590,6 +4645,7 @@ window.payService = async function (index, bookingId) {
         svc.PAID_BY = j.paidBy; svc.PAID_DT = j.paidAt; svc.PAID_METHOD = j.method; svc.PAID_REMARKS = j.notes; svc.PAID_AMOUNT = j.paidTotal;
         updateAddedServicesList(bookingId);
         calculateBalance(bookingId, realId);
+        if (res.value.notes) updateRemarksButtonColor(bookingId);
         try { if (typeof scheduleCalendarRefresh === 'function') scheduleCalendarRefresh(); } catch (e) { /* no-op */ }
         toastSuccess('Paid', `${esc(svc.SERVICE_NAME || 'Service')}: ${money(j.paid)} received.` + (j.remaining > 0 ? ` ${money(j.remaining)} left.` : ''));
     } catch (e) {
@@ -5022,10 +5078,14 @@ async function calculateTotalCost(bookingId) {
 
     // Get penalty amount from billing data
     let penaltyAmount = 0;
+    let masterBillTotal = null; // main room of a one-bill group: the bill also carries the other rooms' services
     try {
         const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
         const billingData = await billingResponse.json();
         penaltyAmount = parseFloat(billingData.penaltyAmount) || 0;
+        if (Array.isArray(billingData.masterRooms) && billingData.masterRooms.length) {
+            masterBillTotal = parseFloat(billingData.subTotal);
+        }
     } catch (error) {
         console.error('Error fetching penalty amount:', error);
     }
@@ -5038,6 +5098,9 @@ async function calculateTotalCost(bookingId) {
 
     // Compute final grand total (including penalty)
     let grandTotal = roomCost + extraServicesCost + lateCheckoutCharge + penaltyAmount;
+
+    // the main room of a group shows the whole group's bill, the same Grand Total as its Guest Bill
+    if (Number.isFinite(masterBillTotal)) grandTotal = masterBillTotal;
 
     // Validate grand total
     if (isNaN(grandTotal)) grandTotal = 0;
@@ -5814,9 +5877,10 @@ function parseBillingChargeItems(billingData) {
     let servicesTotal = 0;
 
     if (!billingData?.items?.length) {
-        return { roomRate, originalQty, extensionDays, extensionRate, extensionAmount, servicesTotal };
+        return { roomRate, originalQty, extensionDays, extensionRate, extensionAmount, servicesTotal, perNightItems: [] };
     }
 
+    const perNightItems = [];   // services charged per night (extra bed)
     const roomItem = billingData.items[0];
     roomRate = parseFloat(roomItem.basePrice) || 0;
     originalQty = parseFloat(roomItem.qty) || 1;
@@ -5836,6 +5900,7 @@ function parseBillingChargeItems(billingData) {
             if (itemRate > 0) extensionRate = itemRate;
         } else {
             servicesTotal += parseFloat(item.subTotal) || 0;
+            if (item.perNight) perNightItems.push({ ...item.perNight, subTotal: parseFloat(item.subTotal) || 0 });
         }
     }
 
@@ -5843,7 +5908,7 @@ function parseBillingChargeItems(billingData) {
         extensionRate = extensionAmount / extensionDays;
     }
 
-    return { roomRate, originalQty, extensionDays, extensionRate, extensionAmount, servicesTotal };
+    return { roomRate, originalQty, extensionDays, extensionRate, extensionAmount, servicesTotal, perNightItems };
 }
 
 // Helper function to compute checkout context (financial details)
@@ -5876,7 +5941,8 @@ async function computeCheckoutContext(bookingId) {
             extensionDays,
             extensionRate,
             extensionAmount,
-            servicesTotal
+            servicesTotal,
+            perNightItems
         } = parseBillingChargeItems(billingData);
 
         let calendarActualDays = 1;
@@ -5908,9 +5974,20 @@ async function computeCheckoutContext(bookingId) {
             billedExtensionAmount = extensionRate * billedExtensionDays;
         }
 
+        // Extra bed (per night): the nights not stayed come off too, the same way the server saves it at check-out.
+        let extraBedReduction = 0;
+        if (isEarlyCheckout) {
+            const nightsStayed = billedRoomDays + billedExtensionDays;
+            perNightItems.forEach((line) => {
+                const nights = Math.max(1, nightsStayed - (line.offset || 0));
+                extraBedReduction += Math.max(0, line.subTotal - line.qty * line.price * nights);
+            });
+        }
+        const billedServicesTotal = servicesTotal - extraBedReduction;
+
         const fullRoomAmount = roomRate * originalQty;
         const fullGrossTotal = fullRoomAmount + extensionAmount + servicesTotal;
-        const grossTotal = roomAmountForActualDays + billedExtensionAmount + servicesTotal;
+        const grossTotal = roomAmountForActualDays + billedExtensionAmount + billedServicesTotal;
         const earlyCheckoutAdjustment = Math.max(0, fullGrossTotal - grossTotal);
         const netBalance = grossTotal - reservationFee;
         const overpayment = Math.max(0, totalPaid - netBalance);
@@ -5932,8 +6009,9 @@ async function computeCheckoutContext(bookingId) {
             extensionRate,
             extensionAmount,
             billedExtensionAmount,
-            servicesTotal,
-            servicesAndExtensionsTotal: billedExtensionAmount + servicesTotal,
+            servicesTotal: billedServicesTotal,
+            extraBedReduction,
+            servicesAndExtensionsTotal: billedExtensionAmount + billedServicesTotal,
             roomAmountForActualDays,
             grossTotal,
             fullGrossTotal,
@@ -5989,7 +6067,8 @@ function buildCheckoutEarlyCheckoutBanner(checkoutContext) {
         billedExtensionDays,
         isEarlyRoomCheckout,
         isEarlyExtensionCheckout,
-        earlyCheckoutAdjustment
+        earlyCheckoutAdjustment,
+        extraBedReduction
     } = checkoutContext;
 
     let detail = '';
@@ -5998,6 +6077,9 @@ function buildCheckoutEarlyCheckoutBanner(checkoutContext) {
     }
     if (isEarlyExtensionCheckout && extensionDays > 0) {
         detail += `Extension adjusted to <strong>${billedExtensionDays}</strong> of <strong>${extensionDays}</strong> extended day(s). `;
+    }
+    if (extraBedReduction > 0) {
+        detail += `Extra bed for the unused night(s): <strong>${formatCheckoutCurrency(extraBedReduction)}</strong> taken off. `;
     }
     if (earlyCheckoutAdjustment > 0) {
         detail += `Charges reduced by <strong>${formatCheckoutCurrency(earlyCheckoutAdjustment)}</strong>.`;
@@ -10305,9 +10387,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
     }
     
     // Calculate days difference
-    const daysDiff = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
-    // Ensure minimum 1 day for same-day bookings
-    const displayDaysDiff = daysDiff <= 0 ? 1 : daysDiff;
+    const displayDaysDiff = countStayNights(checkInDate, checkOutDate);
     
     // Create modal HTML
     const modalHTML = `
@@ -11828,6 +11908,7 @@ async function updateRemark(bookingId, remarkId) {
             
             // Reload remarks
             await loadRemarks(bookingId);
+            await updateRemarksButtonColor(bookingId);
             
             // Update S and M indicator colors on booking card
             if (typeof updateMemoIndicator === 'function') {

@@ -136,7 +136,7 @@ class BookingController {
           if (d) {
             const fmt = (v) => new Date(v).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
             const inDate = new Date(d.CHECK_IN_DATE);
-            const nights = Math.max(1, Number(d.ORIGINAL_DAYS) || Math.round((new Date(d.CHECK_OUT_DATE) - inDate) / 86400000));
+            const nights = Math.max(1, Number(d.ORIGINAL_DAYS) || Math.round((new Date(d.CHECK_OUT_DATE).setHours(0, 0, 0, 0) - new Date(inDate).setHours(0, 0, 0, 0)) / 86400000));
             const outDate = new Date(inDate.getTime() + nights * 86400000);
             const rate = Number(d.ROOM_RATE) || 0;
             // the booking's extra services (and extended stay), one quotation row each
@@ -849,13 +849,7 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
-      // PUAP: flight number is required for whichever of Pick-up/Drop-off is selected
-      if (pickupServiceId && (!flightNumber || !String(flightNumber).trim())) {
-        return res.status(400).json({ success: false, message: 'Flight Number is required for Pick-up.' });
-      }
-      if (dropoffServiceId && (!dropoffFlightNumber || !String(dropoffFlightNumber).trim())) {
-        return res.status(400).json({ success: false, message: 'Flight Number is required for Drop-off.' });
-      }
+      // PUAP: the flight numbers are optional (picked from the Flight Schedule or typed); the passengers are needed
       if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
         return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
       }
@@ -2166,15 +2160,9 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
-      // PUAP: flight number and passenger count are required whenever Pick-up or Drop-off is selected
+      // PUAP: the passenger count is required whenever Pick-up or Drop-off is selected; flight numbers are optional
       if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
-        return res.status(400).json({ success: false, message: 'Flight Number and Number of Passengers are required for Pick-up/Drop-off.' });
-      }
-      if (pickupServiceId && (!flightNumber || !String(flightNumber).trim())) {
-        return res.status(400).json({ success: false, message: 'Pick-up Flight Number is required for Pick-up.' });
-      }
-      if (dropoffServiceId && ((!dropoffFlightNumber || !String(dropoffFlightNumber).trim()) && (!flightNumber || !String(flightNumber).trim()))) {
-        return res.status(400).json({ success: false, message: 'Drop-off Flight Number is required for Drop-off.' });
+        return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
       }
 
       // Calculate payment status based on paid amount for group booking
@@ -3438,6 +3426,7 @@ class BookingController {
           reservationFee: voucherData.reservationFee || 0,
           discount: voucherData.discount || 0,
           checkOutStatus: voucherData.checkOutStatus,
+          billedNights: voucherData.billedNights,
           lateCheckoutFee,
           total,
           paidAmount,
@@ -3872,13 +3861,7 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
-      // PUAP: flight number is required for whichever of Pick-up/Drop-off is selected
-      if (pickupServiceId && (!flightNumber || !String(flightNumber).trim())) {
-        return res.status(400).json({ success: false, message: 'Flight Number is required for Pick-up.' });
-      }
-      if (dropoffServiceId && (!dropoffFlightNumber || !String(dropoffFlightNumber).trim())) {
-        return res.status(400).json({ success: false, message: 'Flight Number is required for Drop-off.' });
-      }
+      // PUAP: the flight numbers are optional (picked from the Flight Schedule or typed); the passengers are needed
       if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
         return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
       }
@@ -4616,6 +4599,7 @@ class BookingController {
         reservationFee: voucherData.reservationFee || 0,
         discount: voucherData.discount || 0,
         checkOutStatus: voucherData.checkOutStatus,
+        billedNights: voucherData.billedNights,
         lateCheckoutFee,
         total,
         paidAmount,

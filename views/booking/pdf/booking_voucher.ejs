@@ -129,8 +129,13 @@
             try {
               const from = new Date(dateFrom);
               const to = new Date(dateTo);
-              const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
-              const nights = diffDays || 1;
+              // nights are counted by date only: a late check-out (11 PM) does not add a night
+              from.setHours(0, 0, 0, 0);
+              to.setHours(0, 0, 0, 0);
+              const diffDays = Math.round((to - from) / (1000 * 60 * 60 * 24));
+              // a saved booking prints the nights of its booking window (billed + extended); a form not yet saved, its dates
+              const billed = typeof billedNights !== 'undefined' ? parseInt(billedNights, 10) || 0 : 0;
+              const nights = billed || diffDays || 1;
           %>
           <%= nights %> NIGHT<%= nights > 1 ? 'S' : '' %>
           <% } catch(e) { %>1 NIGHT<% } %>
@@ -263,7 +268,10 @@
             try {
                 const from = new Date(dateFrom);
                 const to = new Date(dateTo);
-                const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
+                // nights are counted by date only: a late check-out (11 PM) does not add a night
+                from.setHours(0, 0, 0, 0);
+                to.setHours(0, 0, 0, 0);
+                const diffDays = Math.round((to - from) / (1000 * 60 * 60 * 24));
                 const nights = diffDays || 1;
                 const roomRateNum = parseFloat(roomRate.toString().replace(/[,\s₱₹$]/g, '')) || 0;
                 cleanRoomCharges = roomRateNum * nights;

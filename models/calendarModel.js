@@ -1,4 +1,5 @@
 const { pool, queryDatabase, queryDatabasePromise } = require('../config/database');
+const { syncPerNightServices } = require('../utils/perNightServices');
 
 class CalendarModel {
   // Get all bookings for calendar display
@@ -1231,6 +1232,7 @@ class CalendarModel {
         parsedCost,
         userId// Use actual user ID or default to 1
       ]);
+      await syncPerNightServices([bookingId]);   // extra bed: the added nights
 
       await queryDatabasePromise(
         `UPDATE billing
@@ -1336,6 +1338,7 @@ class CalendarModel {
 
       // Commit transaction
       await queryDatabasePromise('COMMIT');
+      await syncPerNightServices([bookingId]);   // extra bed: without the removed nights
 
       return { 
         success: true, 

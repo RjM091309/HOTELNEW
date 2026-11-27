@@ -158,7 +158,11 @@ function computeEditGroupTotal() {
     if (groupBookingId && window.editGroupAddedServicesMap && window.editGroupAddedServicesMap[groupBookingId]) {
         window.editGroupAddedServicesMap[groupBookingId].forEach(service => {
             if (!service.HIDDEN_FOR_UI) {
-                const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                let serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                // per night (extra bed): follows the group's nights; rooms with their own dates keep the saved amount
+                if (service.PER_NIGHT && !Object.keys(individualNightsMap).length) {
+                    serviceCost = service.PER_NIGHT.price * Math.max(1, mainNights + service.PER_NIGHT.ext - service.PER_NIGHT.offset);
+                }
                 const quantity = parseInt(service.QUANTITY) || 0;
                 extraServicesTotal += serviceCost * quantity;
             }

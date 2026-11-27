@@ -1078,8 +1078,12 @@ function showVoucherDetails(bookingID) {
                 if (data.dateFrom && data.dateTo) {
                     const checkIn = new Date(data.dateFrom);
                     const checkOut = new Date(data.dateTo);
+                    // nights are counted by date only: a late check-out (11 PM) does not add a night
+                    checkIn.setHours(0, 0, 0, 0);
+                    checkOut.setHours(0, 0, 0, 0);
                     const diffTime = Math.abs(checkOut - checkIn);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    // same nights as the booking window (billed + extended)
+                    const diffDays = parseInt(data.billedNights, 10) || Math.round(diffTime / (1000 * 60 * 60 * 24)) || 1;
                     const nights = diffDays === 1 ? '1 NIGHT' : `${diffDays} NIGHTS`;
                     document.getElementById('voucher-length-stay').textContent = nights;
                 } else {

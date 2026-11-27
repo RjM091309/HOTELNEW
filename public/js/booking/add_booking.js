@@ -1006,10 +1006,14 @@ function computeTotal() {
     const pickupPrice = pickupChecked ? parseMoney($('#pickupPrice').val()) : 0;
     const dropoffPrice = dropoffChecked ? parseMoney($('#dropoffPrice').val()) : 0;
     const extraBfTotal = getSingleExtraBreakfast().total;
-    // Extra bed: beds x price of one bed
-    const extraBedTotal = $('#includeExtraBed').prop('checked')
-        ? (Math.max(0, parseInt($('#extraBedQty').val(), 10) || 0) * parseMoney($('#extraBedPrice').val()))
-        : 0;
+    // Extra bed: beds x price of one bed for one night x nights
+    const extraBedBeds = $('#includeExtraBed').prop('checked') ? Math.max(0, parseInt($('#extraBedQty').val(), 10) || 0) : 0;
+    const extraBedRate = parseMoney($('#extraBedPrice').val());
+    const extraBedNights = getStayNights();
+    const extraBedTotal = extraBedBeds * extraBedRate * extraBedNights;
+    $('#extraBedHint').text(extraBedBeds
+        ? `${extraBedBeds} bed${extraBedBeds === 1 ? '' : 's'} × ₱${extraBedRate.toLocaleString('en-US')} × ${extraBedNights} night${extraBedNights === 1 ? '' : 's'} = ₱${extraBedTotal.toLocaleString('en-US')}`
+        : '');
 
     // Reservation Fee and Discount
     const reservationFeeChecked = $('#includeReservationFee').prop('checked');
@@ -1311,14 +1315,44 @@ function hideSearchResults() {
     }, 200); // Delay to allow for clicks inside the search results
 }
 
+// Nationality: a list to pick from, plus "Custom" to type any other. The #nationality box always holds the value
+// that gets saved; it is only shown for Custom.
+const NATIONALITY_CUSTOM = '__custom__';
+function showNationality(value) {
+    const select = document.getElementById('nationalitySelect');
+    const input = document.getElementById('nationality');
+    if (!input) return;
+    const text = String(value || '').trim();
+    if (!select) { input.value = text; return; }
+    const listed = Array.from(select.options)
+        .find((o) => o.value !== NATIONALITY_CUSTOM && o.value.toLowerCase() === text.toLowerCase());
+    select.value = listed ? listed.value : NATIONALITY_CUSTOM;
+    input.value = listed ? listed.value : text;
+    input.style.display = listed ? 'none' : '';
+}
+document.addEventListener('change', (e) => {
+    if (!e.target || e.target.id !== 'nationalitySelect') return;
+    const input = document.getElementById('nationality');
+    if (!input) return;
+    const custom = e.target.value === NATIONALITY_CUSTOM;
+    input.value = custom ? '' : e.target.value;
+    input.style.display = custom ? '' : 'none';
+    if (custom) input.focus();
+});
+// the list always matches what is in the box when the window opens
+document.addEventListener('shown.bs.modal', (e) => {
+    if (e.target && e.target.id === 'modal-addbooking') {
+        showNationality((document.getElementById('nationality') || {}).value);
+    }
+});
+
 // Function to select customer
 function selectCustomer(name, level, customerId, contactNo, guestType, nationality) {
     document.getElementById('txtFullNameAdd').value = name;
     document.getElementById('searchResults').style.display = 'none';
 
     // Prefill nationality from the selected customer
-    const nationalityInput = document.getElementById('nationality');
-    if (nationalityInput) nationalityInput.value = nationality || '';
+    showNationality(nationality);
 
     // Set the Contact Number field
     if (window.ContactChannel) {
@@ -2380,8 +2414,7 @@ $(document).ready(function () {
 
         // Only reset when the input field is completely cleared
         if (this.value.trim() === '') {
-            const nationalityInput = document.getElementById('nationality');
-            if (nationalityInput) nationalityInput.value = '';
+            showNationality('');
         }
     });
 
@@ -2565,7 +2598,8 @@ $(document).ready(function () {
       const extraBedQtyNow = $('#includeExtraBed').is(':checked') ? Math.max(0, parseInt($('#extraBedQty').val(), 10) || 0) : 0;
       const extraBedPriceNow = $('#includeExtraBed').is(':checked') ? (parseFloat(($('#extraBedPrice').val() || '0').toString().replace(/,/g, '')) || 0) : 0;
       const extraBfNow = getSingleExtraBreakfast();
-      const servicesTotal = parseFloat((breakfastTotal + pickup + dropoff + extraBfNow.total + extraBedQtyNow * extraBedPriceNow).toFixed(2));
+      const extraBedNightsNow = getStayNights();
+      const servicesTotal = parseFloat((breakfastTotal + pickup + dropoff + extraBfNow.total + extraBedQtyNow * extraBedPriceNow * extraBedNightsNow).toFixed(2));
 
       const bookingData = {
         voucherNo: $('#voucherNo').val(),
@@ -2601,6 +2635,7 @@ $(document).ready(function () {
         servicesTotal: servicesTotal.toFixed(2),
         extraBedQty: extraBedQtyNow,
         extraBedPrice: extraBedPriceNow,
+        extraBedNights: extraBedNightsNow,
         extraBfQty: extraBfNow.qty,
         extraBfTotal: extraBfNow.total,
         extraBfAdultQty: extraBfNow.adultQty,

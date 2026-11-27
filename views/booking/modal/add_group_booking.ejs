@@ -315,13 +315,13 @@
             <div id="groupPickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
               <div class="d-flex gap-2 align-items-end flex-wrap">
                 <div id="groupPickupFlightWrap" class="form-group flex-fill" style="min-width: 140px; position: relative; display: none;">
-                  <label class="form-label">Pick-up Flight Number</label>
-                  <input type="text" class="form-control" id="groupFlightNumber" name="groupFlightNumber" placeholder="e.g. PR123" autocomplete="off">
+                  <label class="form-label">Pick-up Flight Number <small class="text-muted">(optional)</small></label>
+                  <input type="text" class="form-control" id="groupFlightNumber" name="groupFlightNumber" maxlength="20" placeholder="Pick or type, e.g. PR123" autocomplete="off">
                   <div id="groupFlightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                 </div>
                 <div id="groupDropoffFlightWrap" class="form-group flex-fill" style="min-width: 140px; position: relative; display: none;">
-                  <label class="form-label">Drop-off Flight Number</label>
-                  <input type="text" class="form-control" id="groupDropoffFlightNumber" name="groupDropoffFlightNumber" placeholder="e.g. PR124" autocomplete="off">
+                  <label class="form-label">Drop-off Flight Number <small class="text-muted">(optional)</small></label>
+                  <input type="text" class="form-control" id="groupDropoffFlightNumber" name="groupDropoffFlightNumber" maxlength="20" placeholder="Pick or type, e.g. PR123" autocomplete="off">
                   <div id="groupDropoffFlightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                 </div>
                 <div class="form-group flex-shrink-0" style="width: 160px;">
@@ -350,7 +350,7 @@
                   <div class="gbx-sub">Choose which room gets the extra bed</div>
                   <div class="gbx-prices">
                     <div>
-                      <label for="groupExtraBedPrice">Price per bed</label>
+                      <label for="groupExtraBedPrice">Price per bed / night</label>
                       <input type="number" class="form-control" id="groupExtraBedPrice" name="groupExtraBedPrice" value="1500" min="0" step="1">
                     </div>
                   </div>
@@ -2309,7 +2309,9 @@
     if (!groupExtraBedSeeded && ids.length) { groupExtraBedByRoom[ids[0]] = 1; groupExtraBedSeeded = true; }
     const rows = ids.map((id) => ({ id: id, q: groupExtraBedByRoom[id] || 0 }));
     const totalQty = rows.reduce((n, r) => n + r.q, 0);
-    const total = totalQty * price;
+    const nights = Math.max(1, parseInt($('#groupNights').val(), 10) || 0);
+    const total = totalQty * price * nights;   // per bed, per night
+    const nightsText = nights + (nights === 1 ? ' night' : ' nights');
 
     const money = (n) => '₱' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const step = (id, val, atMin, atMax) =>
@@ -2327,9 +2329,9 @@
       const body = rows.map((r) => {
         const room = groupAvailableRooms.find((x) => normalizeRoomId(x.IDNo) === normalizeRoomId(r.id));
         const label = room && room.ROOM_NUMBER ? room.ROOM_NUMBER : r.id;
-        return '<tr><td>' + label + '</td><td>' + step(r.id, r.q, r.q <= 0, r.q >= GROUP_EXTRA_BED_MAX_PER_ROOM) + '</td><td>' + money(r.q * price) + '</td></tr>';
+        return '<tr><td>' + label + '</td><td>' + step(r.id, r.q, r.q <= 0, r.q >= GROUP_EXTRA_BED_MAX_PER_ROOM) + '</td><td>' + money(r.q * price * nights) + '</td></tr>';
       }).join('');
-      html = '<table class="gbx-table"><thead><tr><th>Room</th><th>Beds <small>(' + money(price) + ' each)</small></th><th>Amount</th></tr></thead><tbody>' + allRow + body + '</tbody></table>';
+      html = '<table class="gbx-table"><thead><tr><th>Room</th><th>Beds <small>(' + money(price) + ' per night)</small></th><th>Amount <small>(' + nightsText + ')</small></th></tr></thead><tbody>' + allRow + body + '</tbody></table>';
     }
     const $list = $('#groupExtraBedRooms');
     const keep = $list.scrollTop();
@@ -5141,7 +5143,7 @@
     }
     function render(items) {
       var $dd = $('#' + dropdownId);
-      if (!items.length) { $dd.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">No flight in Flight Schedule</div>').show(); return; }
+      if (!items.length) { $dd.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">Not in Flight Schedule: saved as typed</div>').show(); return; }
       $dd.empty();
       items.forEach(function(f) {
         var code = f[codeField] || '', airline = f.FLIGHT_NUMBER || '';
@@ -5164,5 +5166,5 @@
   setup('groupDropoffFlightNumber', 'groupDropoffFlightNumberDropdown', 'DEPARTURE');
 })();
 </script>
-<script src="/js/booking/group_booking_submit.js?v=bf-qty-1"></script>
+<script src="/js/booking/group_booking_submit.js?v=flight-optional-1"></script>
 

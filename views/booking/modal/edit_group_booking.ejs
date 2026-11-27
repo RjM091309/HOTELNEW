@@ -3193,6 +3193,8 @@ function loadEditGroupExistingServices(groupBookingId) {
                             SERVICE_ID: service.SERVICE_ID,
                             SERVICE_NAME: service.SERVICE_NAME,
                             SERVICE_COST: costPerUnit,
+                            // charged per night (extra bed): the total follows the nights in this form
+                            PER_NIGHT: service.PER_NIGHT_PRICE ? { price: parseFloat(service.PER_NIGHT_PRICE), offset: parseInt(service.NIGHTS_OFFSET, 10) || 0, ext: parseInt(service.EXT_NIGHTS, 10) || 0 } : null,
                             QUANTITY: quantity,
                             STATUS: (service.STATUS || 'unpaid').toLowerCase(),
                             IS_CUSTOM: service.SERVICE_ID === -1,

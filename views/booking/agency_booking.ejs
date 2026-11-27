@@ -172,10 +172,10 @@
 
 
 
-<script src="/js/booking/booking_data.js?v=late-checkin-date-fix-1"></script>
+<script src="/js/booking/booking_data.js?v=voucher-nights-2"></script>
 
 <!-- Include room-menu_data.js for remarks functionality -->
-<script src="/js/dashboard/room-menu_data.js?v=transfer-bf-3"></script>
+<script src="/js/dashboard/room-menu_data.js?v=remarks-show-1"></script>
 <script>
 // Fallback for editDirect function if not yet loaded from modal
 if (typeof window.editDirect === 'undefined') {
@@ -332,7 +332,7 @@ if (typeof window.editDirect === 'undefined') {
 </script>
 
 <script src="/js/booking/maintenance_popup.js?v=ooo-1"></script>
-<script src="/js/booking/booking_submit.js?v=bf-qty-1"></script> 
+<script src="/js/booking/booking_submit.js?v=flight-optional-1"></script> 
 
 <script>
 $(document).ready(function () {
@@ -687,8 +687,12 @@ function showVoucherDetails(bookingID) {
                 if (data.dateFrom && data.dateTo) {
                     const checkIn = new Date(data.dateFrom);
                     const checkOut = new Date(data.dateTo);
+                    // nights are counted by date only: a late check-out (11 PM) does not add a night
+                    checkIn.setHours(0, 0, 0, 0);
+                    checkOut.setHours(0, 0, 0, 0);
                     const diffTime = Math.abs(checkOut - checkIn);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    // same nights as the booking window (billed + extended)
+                    const diffDays = parseInt(data.billedNights, 10) || Math.round(diffTime / (1000 * 60 * 60 * 24)) || 1;
                     const nights = diffDays === 1 ? '1 NIGHT' : `${diffDays} NIGHTS`;
                     document.getElementById('voucher-length-stay').textContent = nights;
                 } else {

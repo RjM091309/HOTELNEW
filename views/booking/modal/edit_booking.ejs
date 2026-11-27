@@ -250,8 +250,8 @@
                                         <input type="number" class="form-control" id="edit_passengerCount" name="passengerCount" placeholder="Number of Passengers" min="1" step="1">
                                     </div>
                                     <div id="edit_flightNumberWrapper" class="col-lg-4 form-group" style="position: relative; display: none;">
-                                        <label class="form-label">Flight Number</label>
-                                        <input type="text" class="form-control" id="edit_flightNumber" name="flightNumber" placeholder="e.g. PR123" autocomplete="off">
+                                        <label class="form-label">Flight Number <small class="text-muted">(optional)</small></label>
+                                        <input type="text" class="form-control" id="edit_flightNumber" name="flightNumber" maxlength="20" placeholder="Pick or type, e.g. PR123" autocomplete="off">
                                         <div id="edit_flightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                                     </div>
                                     <div id="edit_pickupDateWrapper" class="col-lg-4 form-group" style="display: none;">
@@ -259,8 +259,8 @@
                                         <input type="text" class="form-control flatpickr-input" id="edit_pickupDate" name="pickupDate" placeholder="Select date" autocomplete="off">
                                     </div>
                                     <div id="edit_dropoffFlightNumberWrapper" class="col-lg-4 form-group" style="position: relative; display: none;">
-                                        <label class="form-label">Drop-off Flight Number</label>
-                                        <input type="text" class="form-control" id="edit_dropoffFlightNumber" name="dropoffFlightNumber" placeholder="e.g. PR123" autocomplete="off">
+                                        <label class="form-label">Drop-off Flight Number <small class="text-muted">(optional)</small></label>
+                                        <input type="text" class="form-control" id="edit_dropoffFlightNumber" name="dropoffFlightNumber" maxlength="20" placeholder="Pick or type, e.g. PR123" autocomplete="off">
                                         <div id="edit_dropoffFlightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                                     </div>
                                 </div>
@@ -1481,28 +1481,12 @@ $(document).ready(function() {
 
         const bookingId = $('#edit_bookingId').val();
 
-        // Flight number and passenger count are required whenever Pick-up or Drop-off is checked
+        // The passenger count is required whenever Pick-up or Drop-off is checked; flight numbers are optional
         const editIncludePickup = $('#edit_includePickup').is(':checked');
         const editIncludeDropoff = $('#edit_includeDropoff').is(':checked');
         const editFlightNumber = $('#edit_flightNumber').val();
         const editDropoffFlightNumber = $('#edit_dropoffFlightNumber').val();
         const editPassengerCount = $('#edit_passengerCount').val();
-        if (editIncludePickup && (!editFlightNumber || !editFlightNumber.trim())) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Flight Info Required',
-                text: 'Please enter the Flight Number for Pick-up.',
-            });
-            return;
-        }
-        if (editIncludeDropoff && (!editDropoffFlightNumber || !editDropoffFlightNumber.trim())) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Flight Info Required',
-                text: 'Please enter the Flight Number for Drop-off.',
-            });
-            return;
-        }
         if ((editIncludePickup || editIncludeDropoff) && !editPassengerCount) {
             Swal.fire({
                 icon: 'error',
@@ -1911,6 +1895,8 @@ function loadEditExistingServices(bookingId) {
                         SERVICE_ID: service.SERVICE_ID,
                         SERVICE_NAME: service.SERVICE_NAME,
                         SERVICE_COST: costPerUnit,
+                        // charged per night (extra bed): the total follows the nights in this form
+                        PER_NIGHT: service.PER_NIGHT_PRICE ? { price: parseFloat(service.PER_NIGHT_PRICE), offset: parseInt(service.NIGHTS_OFFSET, 10) || 0, ext: parseInt(service.EXT_NIGHTS, 10) || 0 } : null,
                         QUANTITY: quantity,
                         STATUS: (service.STATUS || 'unpaid').toLowerCase(),
                         IS_CUSTOM: service.SERVICE_ID === -1,
@@ -2212,7 +2198,8 @@ function computeEditTotal() {
     if (bookingId && editAddedServicesMap[bookingId]) {
         editAddedServicesMap[bookingId].forEach(service => {
             if (!service.HIDDEN_FOR_UI) {
-                const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                let serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                if (service.PER_NIGHT) serviceCost = service.PER_NIGHT.price * Math.max(1, nights + service.PER_NIGHT.ext - service.PER_NIGHT.offset);
                 const quantity = parseInt(service.QUANTITY) || 0;
                 extraServicesTotal += serviceCost * quantity;
             }
@@ -3071,7 +3058,7 @@ function processEditBookingPayment(bookingId, paymentAmount, paymentMethod, paym
         function renderDropdown(list) {
             const $dropdown = $('#' + dropdownId);
             if (!list || list.length === 0) {
-                $dropdown.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">No flight in Flight Schedule</div>').show();
+                $dropdown.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">Not in Flight Schedule: saved as typed</div>').show();
                 return;
             }
             $dropdown.empty();

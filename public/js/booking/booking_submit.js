@@ -213,24 +213,6 @@ $(document).ready(function () {
         return;
       }
 
-      if (includePickup && (!flightNumber || !flightNumber.trim())) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Flight Info Required',
-          text: 'Please enter the Flight Number for Pick-up.',
-        });
-        return;
-      }
-
-      if (includeDropoff && (!dropoffFlightNumber || !dropoffFlightNumber.trim())) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Flight Info Required',
-          text: 'Please enter the Flight Number for Drop-off.',
-        });
-        return;
-      }
-
       if ((includePickup || includeDropoff) && !passengerCount) {
         Swal.fire({
           icon: 'error',

@@ -2,6 +2,7 @@ const { queryDatabasePromise, pool } = require('../config/database');
 const CalendarModel = require('./calendarModel');
 const { loadPropertyLogoDataUri, loadPropertyInfo } = require('../helpers/propertyBranding');
 const { getMasterGroupMates } = require('../helpers/masterBilling');
+const { isPerNightService, syncPerNightServices, addPerNightService } = require('../utils/perNightServices');
 
 class BookingModel {
 
@@ -1188,6 +1189,9 @@ class BookingModel {
 
         // Prorate unused extension days so billing receipt matches early checkout
         await BookingModel.prorateExtensionsOnEarlyCheckout(connection, ids, encodedBy, effDateExpr);
+
+        // Per-night services (extra bed): only the nights charged, the unused ones become refundable
+        await syncPerNightServices(ids, connection);
       }
 
       // Remove discount from billing and payments if applyDiscount is false (early checkout without discount)
@@ -2244,16 +2248,17 @@ class BookingModel {
           }
         }
 
-        // Extra bed: one custom line (beds x price of one bed) on this booking's bill, shown in Extra Services
+        // Extra bed: one custom line (beds x price of one bed for one night x nights) on this booking's bill, shown in Extra Services
         const extraBedQtyNum = Math.max(0, Math.min(9, parseInt(extraBedQty, 10) || 0));
         const extraBedPriceNum = Math.max(0, parseFloat(extraBedPrice) || 0);
         if (extraBedQtyNum > 0 && extraBedPriceNum > 0) {
-          const bedCost = extraBedQtyNum * extraBedPriceNum;
+          const bedNights = Math.max(1, parseInt(diffindays, 10) || 1);
+          const bedCost = Math.round(extraBedQtyNum * extraBedPriceNum * bedNights * 100) / 100;
           const bedResult = await new Promise((resolve, reject) => {
             connection.query(
-              `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
-               VALUES (?, -1, ?, ?, ?, ?, ?, 1, 'Extra Bed')`,
-              [bookingId, extraBedQtyNum, bedCost, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date],
+              `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME, PER_NIGHT_PRICE, NIGHTS)
+               VALUES (?, -1, ?, ?, ?, ?, ?, 1, 'Extra Bed', ?, ?)`,
+              [bookingId, extraBedQtyNum, bedCost, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, extraBedPriceNum, bedNights],
               (err, result) => (err ? reject(err) : resolve(result))
             );
           });
@@ -2474,6 +2479,29 @@ class BookingModel {
 
         // Process each service
         for (const service of services) {
+          // The extra bed is charged per night (beds x price x nights), however it is added.
+          const isCustomService = service.SERVICE_ID === -1 || service.IS_CUSTOM;
+          let catalog = null;
+          if (!isCustomService) {
+            const found = await new Promise((resolve, reject) => {
+              connection.query('SELECT SERVICE_NAME, SERVICE_COST FROM services WHERE IDNo = ?', [service.SERVICE_ID], (err, rows) => (err ? reject(err) : resolve(rows)));
+            });
+            catalog = found[0] || null;
+          }
+          const perNightName = isCustomService ? service.SERVICE_NAME : (catalog && catalog.SERVICE_NAME);
+          if (isPerNightService(perNightName)) {
+            const added = await addPerNightService({
+              bookingId,
+              serviceId: isCustomService ? -1 : service.SERVICE_ID,
+              customName: isCustomService ? service.SERVICE_NAME : null,
+              qty: service.QUANTITY,
+              price: service.CUSTOM_COST ?? service.SERVICE_COST ?? (catalog && catalog.SERVICE_COST),
+              userId
+            }, connection);
+            totalCost += added.total;
+            continue;
+          }
+
           // Handle custom services (SERVICE_ID = -1)
           if (service.SERVICE_ID === -1 || service.IS_CUSTOM) {
             // For custom services, create a temporary service entry or handle specially
@@ -3078,7 +3106,18 @@ class BookingModel {
     const qty = parseInt(service.QUANTITY, 10) || 0;
     const unit = parseFloat(service.CUSTOM_COST) || 0;
     const sid = parseInt(service.SERVICE_ID, 10);
+    // the extra bed is charged per night, for each room's own nights
+    let perNightName = service.SERVICE_NAME;
+    if (sid !== -1) {
+      const found = await queryDatabasePromise('SELECT SERVICE_NAME FROM services WHERE IDNo = ?', [sid]);
+      perNightName = found[0] && found[0].SERVICE_NAME;
+    }
     for (const row of others) {
+      if (isPerNightService(perNightName)) {
+        await addPerNightService({ bookingId: row.IDNo, serviceId: sid, customName: sid === -1 ? service.SERVICE_NAME : null, qty, price: unit, userId });
+        await BookingModel.syncServicesCharge(row.IDNo);
+        continue;
+      }
       let merged = false;
       if (sid !== -1) {
         // same service at the same price still unpaid on that room: add to that line
@@ -3216,6 +3255,10 @@ class BookingModel {
           bs.STATUS, 
           bs.ENCODED_DT,
           bs.IDNo AS BS_ID,
+          bs.PER_NIGHT_PRICE,
+          bs.NIGHTS,
+          bs.NIGHTS_OFFSET,
+          (SELECT COALESCE(SUM(be.QTY), 0) FROM booking_extension be WHERE be.BOOKING_ID = bs.BOOKING_ID AND be.ACTIVE = 1) AS EXT_NIGHTS,
           (SELECT COALESCE(u.FULLNAME, u.USERNAME) FROM payments p LEFT JOIN user_info u ON u.IDno = p.ENCODED_BY WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_BY,
           (SELECT p.PAYMENT_DATE FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_DT,
           (SELECT p.PAYMENT_METHOD FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service' ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC LIMIT 1) AS PAID_METHOD,
@@ -3454,6 +3497,7 @@ class BookingModel {
           });
 
           connection.release();
+          await syncPerNightServices([bookingId]);   // extra bed: without the removed nights
 
           return {
             success: true,
@@ -3844,7 +3888,10 @@ class BookingModel {
           END as SERVICE_COST,
           bs.QTY,
           bs.TOTAL_COST,
-          bs.STATUS
+          bs.STATUS,
+          bs.PER_NIGHT_PRICE,
+          bs.NIGHTS,
+          bs.NIGHTS_OFFSET
         FROM booking_service bs
         LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.ACTIVE = 1 AND bs.BOOKING_ID = ?
@@ -3858,7 +3905,7 @@ class BookingModel {
                   bs.SERVICE_ID,
                   CASE WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL THEN bs.CUSTOM_NAME ELSE s.SERVICE_NAME END AS SERVICE_NAME,
                   CASE WHEN bs.SERVICE_ID = -1 THEN bs.TOTAL_COST / NULLIF(bs.QTY, 0) ELSE s.SERVICE_COST END AS SERVICE_COST,
-                  bs.QTY, bs.TOTAL_COST, bs.STATUS
+                  bs.QTY, bs.TOTAL_COST, bs.STATUS, bs.PER_NIGHT_PRICE, bs.NIGHTS, bs.NIGHTS_OFFSET
            FROM booking_service bs LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
            WHERE bs.ACTIVE = 1 AND bs.BOOKING_ID IN (?) ORDER BY bs.BOOKING_ID, bs.IDNo`,
           [masterMates.mates.map((x) => x.id)]
@@ -3994,14 +4041,23 @@ class BookingModel {
           subTotal = feeAmount;
         }
 
+        // per-night service (extra bed): "(₱100.00 × 5 nights)" after the name
+        const perNightPrice = service.PER_NIGHT_PRICE === null || service.PER_NIGHT_PRICE === undefined ? null : parseFloat(service.PER_NIGHT_PRICE);
+        const nightsCharged = parseInt(service.NIGHTS, 10) || 1;
+        const perNightNote = perNightPrice === null ? ''
+          : ` (₱${perNightPrice.toLocaleString('en-US')} × ${nightsCharged} night${nightsCharged === 1 ? '' : 's'})`;
+
         return {
           date: b.CHECK_IN_DATE,
-          description: service.SERVICE_NAME,
+          description: `${service.SERVICE_NAME}${perNightNote}`,
           basePrice,
           qty: isFlatFee ? '-' : service.QTY,
           subTotal,
           status: service.STATUS,
-          serviceId: service.SERVICE_ID
+          serviceId: service.SERVICE_ID,
+          // only the booking's own lines: the check-out window uses this to take off the nights not stayed
+          perNight: perNightPrice === null || service.BOOKING_ID ? null
+            : { qty, price: perNightPrice, nights: nightsCharged, offset: parseInt(service.NIGHTS_OFFSET, 10) || 0 }
         };
       });
 
@@ -4188,7 +4244,9 @@ class BookingModel {
   static async payService({ bookingServiceId, amount, paymentMethod, paymentNotes, encodedBy, propertyId }) {
     const methods = ['cash', 'bank_transfer', 'credit_card', 'korean_bank', 'agoda', 'expedia'];
     if (!methods.includes(String(paymentMethod))) return { error: 'Pick how the guest pays.' };
-    // the service row is locked while its balance is read and the payment saved (a second click waits and then sees it paid)
+    // the service row is locked while its balance is read and the payment saved (a second click waits and then sees it paid).
+    // Every write goes through the locking connection: another connection would wait for this lock until it times out,
+    // leaving the payment saved but the service still "unpaid".
     const lock = await pool.promise().getConnection();
     try {
     await lock.beginTransaction();
@@ -4199,16 +4257,16 @@ class BookingModel {
     const want = amount == null || amount === '' ? bal.remaining : parseFloat(amount);
     if (!(want > 0)) { await lock.rollback(); return { error: 'Enter the amount to pay.' }; }
     const pay = Math.min(bal.remaining, +want.toFixed(2));
-    await queryDatabasePromise(
+    await lock.query(
       `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
        VALUES (?, ?, ?, ?, 'service', NOW(), ?, ?)`,
       [bal.bookingId, bal.id, pay, paymentMethod, encodedBy, paymentNotes || null]
     );
     const remaining = Math.max(0, +(bal.remaining - pay).toFixed(2));
     const status = remaining <= 0.005 ? 'paid' : 'partial';
-    await queryDatabasePromise(`UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`, [status, bal.id]);
+    await lock.query(`UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`, [status, bal.id]);
     if (paymentNotes && String(paymentNotes).trim()) {
-      await queryDatabasePromise(
+      await lock.query(
         `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ENCODED_DT, ACTIVE) VALUES (?, 'Payment', ?, ?, NOW(), 1)`,
         [bal.bookingId, String(paymentNotes).trim(), encodedBy]
       );
@@ -6700,6 +6758,7 @@ class BookingModel {
             `, [
               finalQty, paymentStatus, reservationFeeForBilling, discountForBilling, encodedBy, date, existingBooking.IDNo
             ]);
+            await syncPerNightServices([existingBooking.IDNo], connection);
 
             // Update customer info for all bookings in the group
             // IMPORTANT: Only the main booking (lowest ID) should have "-Main" suffix
@@ -9165,7 +9224,10 @@ class BookingModel {
           const checkOut = new Date(CHECK_OUT_DATE);
           const today = new Date();
 
-          const totalNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+          // nights are counted by date only: a late check-out (11 PM) does not add a night
+          const totalNights = Math.max(1, Math.round(
+            (new Date(checkOut).setHours(0, 0, 0, 0) - new Date(checkIn).setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24)
+          ));
           const dayDiff = Math.floor((checkIn - today) / (1000 * 60 * 60 * 24));
 
           // Calculate penalty using either manual fee (distributed) or policy-based nights
@@ -9793,7 +9855,7 @@ class BookingModel {
         roomCharges: data.roomCharges !== undefined ? data.roomCharges : 0,
         servicesTotal: data.servicesTotal !== undefined ? data.servicesTotal : 0,
         otherServices: (parseInt(data.extraBedQty, 10) > 0 && parseFloat(data.extraBedPrice) > 0)
-          ? [{ name: 'Extra Bed', qty: parseInt(data.extraBedQty, 10), price: parseInt(data.extraBedQty, 10) * parseFloat(data.extraBedPrice) }]
+          ? [{ name: 'Extra Bed', qty: parseInt(data.extraBedQty, 10), price: parseInt(data.extraBedQty, 10) * parseFloat(data.extraBedPrice) * Math.max(1, parseInt(data.extraBedNights, 10) || 1) }]
           : [],
         paidAmount: paidAmount,
         balance: balance
@@ -10718,6 +10780,7 @@ class BookingModel {
               parseFloat(seniorPwdDiscountPercent) || 0.00,
               editedBy, editDate, bookingId
             ]);
+            await syncPerNightServices([bookingId], connection);
 
             // NOTE: the EARLY CHECK IN fee (SERVICE_ID 70) is added at actual
             // check-in from the dashboard, not here - editing a booking leaves it
@@ -12060,8 +12123,8 @@ class BookingModel {
     return { perRoom, adultPrice, kidPrice, adultTotal, kidTotal };
   }
 
-  // Extra beds of a group: the beds of each room (same order as the rooms) and the price of one bed.
-  static groupExtraBeds(perRoomRaw, priceRaw) {
+  // Extra beds of a group: the beds of each room (same order as the rooms), the price of one bed for one night, and the nights.
+  static groupExtraBeds(perRoomRaw, priceRaw, nightsRaw = 1) {
     let list = perRoomRaw;
     if (typeof list === 'string') {
       try { list = JSON.parse(list); } catch (_) { list = []; }
@@ -12069,7 +12132,8 @@ class BookingModel {
     if (!Array.isArray(list)) list = [];
     const perRoom = list.map((q) => Math.max(0, Math.min(9, parseInt(q, 10) || 0)));
     const price = Math.max(0, parseFloat(priceRaw) || 0);
-    return { perRoom: perRoom, price: price, total: perRoom.reduce((n, q) => n + q, 0) * price };
+    const nights = Math.max(1, parseInt(nightsRaw, 10) || 1);
+    return { perRoom: perRoom, price: price, nights: nights, total: Math.round(perRoom.reduce((n, q) => n + q, 0) * price * nights * 100) / 100 };
   }
 
   // addGroupBooking temporarily removed per request
@@ -12496,7 +12560,7 @@ class BookingModel {
           processedAgencyPayer,
           0,
           pickupServiceId ? (flightNumber || null) : null,
-          dropoffServiceId ? (dropoffFlightNumber || flightNumber || null) : null,
+          dropoffServiceId ? (dropoffFlightNumber || null) : null,
           (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null,
           isContractedRate ? 1 : 0,
           propertyId || null
@@ -12743,7 +12807,7 @@ class BookingModel {
         // the 2 breakfasts per room are already inside the room-rate tier.
         const bfExtras = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
         const bfPerRoomUsable = bfExtras.perRoom.length === targetBookingIds.length;
-        const bedBeds = BookingModel.groupExtraBeds(extraBedPerRoom, extraBedPrice);
+        const bedBeds = BookingModel.groupExtraBeds(extraBedPerRoom, extraBedPrice, qty);
         const bedPerRoomUsable = bedBeds.perRoom.length === targetBookingIds.length;
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
           const totalAdult = 0; // the extras are separate per-room lines (below)
@@ -12826,14 +12890,14 @@ class BookingModel {
           const [bedRoomRows] = await connection.promise().query('SELECT IDNo, ROOM_NUMBER FROM room WHERE IDNo IN (?)', [roomIds]);
           const bedRoomNo = new Map(bedRoomRows.map((r) => [String(r.IDNo), r.ROOM_NUMBER]));
           for (let i = 0; i < targetBookingIds.length; i++) {
-            const qty = bedBeds.perRoom[i];
-            if (qty > 0) {
+            const beds = bedBeds.perRoom[i];
+            if (beds > 0) {
               const owner = targetBookingIds[i];
-              const cost = qty * bedBeds.price;
+              const cost = Math.round(beds * bedBeds.price * bedBeds.nights * 100) / 100;
               await connection.promise().query(
-                `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
-                 VALUES (?, -1, ?, ?, 'unpaid', ?, ?, 1, ?)`,
-                [owner, qty, cost, encodedBy, date, `Extra Bed · Room ${bedRoomNo.get(String(roomIds[i])) || roomIds[i]}`]
+                `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME, PER_NIGHT_PRICE, NIGHTS)
+                 VALUES (?, -1, ?, ?, 'unpaid', ?, ?, 1, ?, ?, ?)`,
+                [owner, beds, cost, encodedBy, date, `Extra Bed · Room ${bedRoomNo.get(String(roomIds[i])) || roomIds[i]}`, bedBeds.price, bedBeds.nights]
               );
               addBilling(owner, cost);
             }
@@ -12869,7 +12933,7 @@ class BookingModel {
         ? parseFloat(lateCheckoutFee) * numRooms
         : 0;
       
-      const extraBedsNow = BookingModel.groupExtraBeds(extraBedPerRoom, extraBedPrice);
+      const extraBedsNow = BookingModel.groupExtraBeds(extraBedPerRoom, extraBedPrice, qty);
       const extraBedTotal = extraBedsNow.perRoom.length === targetBookingIds.length ? extraBedsNow.total : 0;
       const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal + extraBedTotal + lateCheckoutFeeTotal;
 
@@ -13305,6 +13369,8 @@ class BookingModel {
           b.REMARKS AS remarks,
           b.CHECK_IN_STATUS AS checkInStatus,
           b.LATE_CHECKOUT AS checkOutStatus,
+          -- the same nights the booking window shows: billed nights + extended nights
+          COALESCE(bill.QTY, 0) + COALESCE(extensions_total.TOTAL_EXTENSION_NIGHTS, 0) AS billedNights,
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
             + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
             + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
@@ -13348,7 +13414,8 @@ class BookingModel {
           LEFT JOIN (
             SELECT 
               be.BOOKING_ID,
-              SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
+              SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST,
+              SUM(be.QTY) AS TOTAL_EXTENSION_NIGHTS
             FROM booking_extension be
             WHERE be.ACTIVE = 1
             GROUP BY be.BOOKING_ID

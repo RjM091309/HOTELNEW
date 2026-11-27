@@ -183,13 +183,11 @@ $(document).ready(function () {
       return;
     }
 
-    if ((includePickup && (!flightNumber || !flightNumber.trim())) ||
-        (includeDropoff && (!dropoffFlightNumber || !dropoffFlightNumber.trim())) ||
-        ((includePickup || includeDropoff) && !passengerCount)) {
+    if ((includePickup || includeDropoff) && !passengerCount) {   // flight numbers are optional
       Swal.fire({
         icon: 'error',
         title: 'Flight Info Required',
-        text: 'Please enter the Flight Number (Pick-up and / or Drop-off) and Number of Passengers.',
+        text: 'Please enter the Number of Passengers for Pick-up/Drop-off.',
       });
       return;
     }

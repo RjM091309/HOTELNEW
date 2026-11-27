@@ -251,8 +251,7 @@ function renderPickupDropTables() {
   dropoffTable.clear();
 
   pickupDropAllRecords.forEach(function (record) {
-    const hasPickupFlightNumber = record.FLIGHT_NUMBER != null && String(record.FLIGHT_NUMBER).trim() !== '';
-    if (Number(record.HAS_PICKUP) === 1 && hasPickupFlightNumber) {
+    if (Number(record.HAS_PICKUP) === 1) {
       const effectiveDate = getEffectivePickupDate(record);
       if (matchesPickupDateFilter(effectiveDate)) {
         const checkInDate = record.CHECK_IN_DATE ? new Date(record.CHECK_IN_DATE) : null;
@@ -262,15 +261,14 @@ function renderPickupDropTables() {
           buildCheckbox(record.BOOKING_ID, 'pickup'),
           record.NAME || '',
           formatDisplayDate(checkInDate),
-          record.FLIGHT_NUMBER || '',
+          record.FLIGHT_NUMBER || '-',
           record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
           buildActions(record.BOOKING_ID, 'pickup')
         ]);
       }
     }
 
-    const hasDropoffFlightNumber = record.DROPOFF_FLIGHT_NUMBER != null && String(record.DROPOFF_FLIGHT_NUMBER).trim() !== '';
-    if (Number(record.HAS_DROPOFF) === 1 && hasDropoffFlightNumber) {
+    if (Number(record.HAS_DROPOFF) === 1) {
       const dropoffDate = record.CHECK_OUT_DATE ? new Date(record.CHECK_OUT_DATE) : null;
       if (dropoffDate && !isNaN(dropoffDate.getTime())) dropoffDate.setHours(0, 0, 0, 0);
       if (matchesDropoffDateFilter(dropoffDate)) {
@@ -278,7 +276,7 @@ function renderPickupDropTables() {
           buildCheckbox(record.BOOKING_ID, 'dropoff'),
           record.NAME || '',
           formatDisplayDate(dropoffDate),
-          record.DROPOFF_FLIGHT_NUMBER || '',
+          record.DROPOFF_FLIGHT_NUMBER || '-',
           record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
           buildActions(record.BOOKING_ID, 'dropoff')
         ]);
@@ -550,14 +548,6 @@ function printPickupDrop(bookingId, type, onComplete) {
 
   const printType = type === 'dropoff' ? 'dropoff' : 'pickup';
   const record = pickupDropRecords[bookingId];
-  const flightNo = printType === 'dropoff' ? record.DROPOFF_FLIGHT_NUMBER : record.FLIGHT_NUMBER;
-
-  if (!flightNo || String(flightNo).trim() === '') {
-    Swal.fire('Error', printType === 'dropoff' ? 'No drop-off flight number set' : 'No pick-up flight number set', 'error');
-    if (typeof onComplete === 'function') onComplete();
-    return;
-  }
-
   const printUrl = '/pickup-drop/print/' + bookingId + '?embed=1&type=' + printType;
   loadPickupDropPrintPage(printUrl, onComplete);
 }
