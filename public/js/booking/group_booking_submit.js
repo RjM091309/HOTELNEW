@@ -125,6 +125,17 @@ $(document).ready(function () {
       return;
     }
 
+    // a ticked breakfast box with no persons would be saved without breakfast
+    if ($('#groupIncludeBreakfast').is(':checked')
+        && !((parseInt(breakfastAdultQty, 10) || 0) + (parseInt(breakfastKidQty, 10) || 0))) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Breakfast Persons Required',
+        text: 'Enter the number of persons per room for breakfast, or untick Add Breakfast.',
+      });
+      return;
+    }
+
     const state = typeof window.getGroupBookingState === 'function'
       ? window.getGroupBookingState()
       : { discount: 0 };

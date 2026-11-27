@@ -158,7 +158,8 @@ class CalendarController {
           extensionDate: extensionDate || null,
           isRoomTransfer: Boolean(isRoomTransfer),
           oldRoomNumber: oldRoomNumber || null,
-          newRoomId: newRoomId || null
+          newRoomId: newRoomId || null,
+          userId: req.user?.userId || null
         },
         req.propertyId
       );
@@ -412,7 +413,7 @@ class CalendarController {
         const ooo = await BookingModelOoo.findOutOfOrderRoom({ roomIds: [newRoomId], propertyId: req.propertyId });
         if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
-      const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, req.propertyId);
+      const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, req.propertyId, req.user?.userId || null);
 
       if (result.success) {
         await logActivity(req, {
@@ -713,7 +714,8 @@ class CalendarController {
         currentRoomId,
         newRoomId,
         bookingId,
-        lateCheckoutFee
+        lateCheckoutFee,
+        req.user?.userId || null
       );
 
       if (result.success) {

@@ -3452,7 +3452,8 @@ function loadTransferHistory(bookingId, currentBookingId) {
                         roomNumber: log.NewRoomNumber,
                         date: log.TRANSFER_DATE,
                         isCurrent: isLast,
-                        description: isLast ? 'Currently occupied since' : 'Transferred to'
+                        description: isLast ? 'Currently occupied since' : 'Transferred to',
+                        movedBy: log.MovedBy
                     });
                 });
                 
@@ -3476,6 +3477,16 @@ function loadTransferHistory(bookingId, currentBookingId) {
                             })}
                         </p>
                     `;
+                    
+                    // which account made this move (transfers saved before this was recorded have no name)
+                    if (room.movedBy) {
+                        const by = document.createElement('span');
+                        by.className = 'transfer-by';
+                        by.style.display = 'block';
+                        by.style.fontWeight = '600';
+                        by.textContent = `Moved by: ${room.movedBy}`;
+                        li.querySelector('.transfer-date').appendChild(by);
+                    }
                     
                     timelineList.appendChild(li);
                 });
@@ -3535,7 +3546,8 @@ if (roomServices.length === 0) {
     serviceList.style.display = 'none';
 } else {
     serviceList.style.display = 'block';
-    
+    const freeBfShown = freeBreakfastShown(roomServices);
+
     roomServices.forEach((service, index) => {
         // Skip helper/pending entries that are not meant to be shown in the UI
         if (service.HIDDEN_FOR_UI) {
@@ -3552,13 +3564,18 @@ if (roomServices.length === 0) {
         // Check if service is Upgrade - display "-" instead of quantity
         const isUpgrade = service.SERVICE_ID === 71 || 
                          service.SERVICE_NAME?.toLowerCase() === 'upgrade';
-        const quantityDisplay = isUpgrade ? '-' : quantity;
-        
+        // A free breakfast line shows only the guests inside the room rate: the others are in the Extra Breakfast row below
+        const shownQty = freeBfShown.has(service) ? freeBfShown.get(service) : quantity;
+        if (freeBfShown.has(service) && shownQty <= 0) return;
+        const quantityDisplay = isUpgrade ? '-' : shownQty;
+
         // Calculate total cost with validation
         const totalCost = serviceCost * quantity;
         
         // Check if calculation is valid
-        const costDisplay = (isNaN(totalCost) || totalCost === 0)
+        // (the breakfast inside the room rate is not free and has no price of its own: nothing is shown for it)
+        const costDisplay = freeBfShown.has(service) ? ''
+            : (isNaN(totalCost) || totalCost === 0)
             ? '<span class="badge bg-success">FREE</span>'
             : `₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -4762,13 +4779,57 @@ function isExtraBfService(service) {
     return !!(service && service.SERVICE_ID === -1 && service.BS_ID && /^Extra Breakfast/i.test(service.SERVICE_NAME || ''));
 }
 
+// Breakfasts inside the room rate: 2 in a room, 5 in a Pool Villa (the villa's 5 guests).
+function includedBreakfastPerRoom() {
+    return document.documentElement.getAttribute('data-property-pricing') === 'guest' ? 5 : 2;
+}
+
+// The saved free breakfast line counts EVERY guest on breakfast (the Breakfast List reads it), extras included. For the screen it
+// is split: free = those guests less the Extra Breakfast lines, never more than what the rate includes. Returns line -> qty to show.
+function freeBreakfastShown(roomServices) {
+    const qtyOf = (s) => parseInt(s.QUANTITY, 10) || 0;
+    const visible = roomServices.filter((s) => !s.HIDDEN_FOR_UI);
+    const free = visible.filter((s) => /^Breakfast \((Adult|Kids?)\)$/i.test(s.SERVICE_NAME || '') && !(parseFloat(s.SERVICE_COST) || 0));
+    const sum = (list, re) => list.filter((s) => re.test(s.SERVICE_NAME || '')).reduce((n, s) => n + qtyOf(s), 0);
+    const extras = visible.filter(isExtraBfService);
+    const adults = sum(free, /Adult/i), kids = sum(free, /Kid/i);
+    const exAdults = sum(extras, /\(Adult\)/i), exKids = sum(extras, /\(Kid\)/i);
+    const included = includedBreakfastPerRoom();
+    // (a single booking keeps all its guests on the adult line, so extra kids come out of that line)
+    let leftA = Math.min(included, Math.max(0, adults - exAdults - Math.max(0, exKids - kids)));
+    let leftK = Math.min(included - leftA, Math.max(0, kids - exKids - Math.max(0, exAdults - adults)));
+    const shown = new Map();
+    free.forEach((s) => {
+        const isAdult = /Adult/i.test(s.SERVICE_NAME);
+        const q = Math.min(qtyOf(s), isAdult ? leftA : leftK);
+        if (isAdult) leftA -= q; else leftK -= q;
+        shown.set(s, q);
+    });
+    return shown;
+}
+
+// Trash button of the Extra Breakfast row: a group with several open rooms picks the rooms, otherwise this booking's own lines
+async function openExtraBfRemove(bookingId) {
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    let data = null;
+    try { data = await (await fetch(`/booking/group-services/${realId}`)).json(); } catch (e) { /* use this booking's lines */ }
+    if (data && data.canGroup) openGroupRemoveDialog(bookingId, 'Extra Breakfast');
+    else openExtraBfPopup(bookingId);
+}
+window.openExtraBfRemove = openExtraBfRemove;
+
 // The single summary row shown in the Extra Services list (the per-room lines live in the pop-up).
 function appendExtraBfSummaryRow(serviceList, bookingId, roomServices) {
     const lines = roomServices.filter(isExtraBfService);
     if (lines.length === 0) return;
     const guests = lines.reduce((s, l) => s + (parseInt(l.QUANTITY, 10) || 0), 0);
     const total = lines.reduce((s, l) => s + (parseFloat(l.SERVICE_COST) || 0) * (parseInt(l.QUANTITY, 10) || 0), 0);
-    const rooms = new Set(lines.map(l => (l.SERVICE_NAME || '').split('·')[1] || l.SERVICE_NAME)).size;
+    const countOf = (re) => lines.filter(l => re.test(l.SERVICE_NAME || '')).reduce((s, l) => s + (parseInt(l.QUANTITY, 10) || 0), 0);
+    const adults = countOf(/\(Adult\)/i), kids = countOf(/\(Kid\)/i);
+    const rooms = new Set(lines.map(l => (l.SERVICE_NAME || '').split('·')[1]).filter(Boolean)).size;
+    const who = [adults ? `${adults} adult${adults === 1 ? '' : 's'}` : '', kids ? `${kids} kid${kids === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ');
+    const detail = [who, rooms > 1 ? `${rooms} rooms` : ''].filter(Boolean).join(' · ');
     const anyUnpaid = lines.some(l => l.STATUS !== 'paid');
     const status = anyUnpaid ? '<span class="badge bg-warning">UNPAID</span>' : '<span class="badge bg-success">PAID</span>';
     const row = document.createElement('div');
@@ -4776,11 +4837,11 @@ function appendExtraBfSummaryRow(serviceList, bookingId, roomServices) {
     row.style.cssText = 'background: #ffffff; color: #333333; border: 1px solid #e9ecef; border-radius: 6px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
     row.innerHTML = `
         <div class="row align-items-center">
-            <div class="col-4"><span style="font-weight: 600; color: #495057; font-size: 0.9rem;">Extra Breakfast <small class="text-muted">(${rooms} room${rooms === 1 ? '' : 's'})</small></span></div>
+            <div class="col-4"><span style="font-weight: 600; color: #495057; font-size: 0.9rem;">Extra Breakfast <small class="text-muted">(${detail})</small></span></div>
             <div class="col-2 text-center"><span style="font-weight: 600; color: #333333; font-size: 0.9rem;">${guests}</span></div>
             <div class="col-2 text-center"><span style="font-weight: 600; color: #28a745; font-size: 0.9rem;">₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
             <div class="col-2 text-center">${status}</div>
-            <div class="col-2 text-center">${anyUnpaid ? `<button class="btn btn-sm" onclick="openGroupRemoveDialog('${bookingId}', 'Extra Breakfast')" title="Remove extra breakfast (choose the rooms)" style="background-color: #f96332; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; box-shadow: 0px 2px 8px rgba(249, 99, 50, 0.3); display: inline-flex; align-items: center; justify-content: center;"><i class="fa fa-trash-alt" style="font-size: 10px;"></i></button>` : ''}</div>
+            <div class="col-2 text-center">${anyUnpaid ? `<button class="btn btn-sm" onclick="openExtraBfRemove('${bookingId}')" title="Remove extra breakfast" style="background-color: #f96332; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; box-shadow: 0px 2px 8px rgba(249, 99, 50, 0.3); display: inline-flex; align-items: center; justify-content: center;"><i class="fa fa-trash-alt" style="font-size: 10px;"></i></button>` : ''}</div>
         </div>`;
     serviceList.appendChild(row);
 }
@@ -4795,9 +4856,9 @@ function openExtraBfPopup(bookingId) {
     const modalEl = document.getElementById('dynamicRoomModal_' + bookingId);
     const readonlyBf = !!(modalEl && modalEl.classList.contains('room-modal-readonly'));
     const rowsHtml = lines.map(({ s, i }) => {
-        const m = (s.SERVICE_NAME || '').match(/Extra Breakfast \((Adult|Kid)\)\s*·\s*Room\s*(.+)$/i);
+        const m = (s.SERVICE_NAME || '').match(/Extra Breakfast \((Adult|Kid)\)(?:\s*·\s*Room\s*(.+))?$/i);
         const type = m ? m[1] : '';
-        const room = m ? m[2] : s.SERVICE_NAME;
+        const room = m && m[2] ? `Room ${m[2]}` : 'This room';   // a single booking's line carries no room number
         const qty = parseInt(s.QUANTITY, 10) || 0;
         const amount = (parseFloat(s.SERVICE_COST) || 0) * qty;
         const paid = s.STATUS === 'paid';
@@ -4806,7 +4867,7 @@ function openExtraBfPopup(bookingId) {
             : `<button type="button" data-act="reduce" data-idx="${i}" title="Take 1 off" style="${btn}background:#ffc107;color:#212529;font-weight:700;">&minus;</button>
                <button type="button" data-act="remove" data-idx="${i}" title="Remove this room's extra" style="${btn}background:#f96332;color:#fff;"><i class="fa fa-trash-alt" style="font-size:10px;"></i></button>`;
         return `<tr>
-            <td style="text-align:left;font-weight:600;">Room ${room}</td>
+            <td style="text-align:left;font-weight:600;">${room}</td>
             <td>${type}</td>
             <td>${qty}</td>
             <td style="color:#28a745;font-weight:600;">${money(amount)}</td>
@@ -4816,7 +4877,7 @@ function openExtraBfPopup(bookingId) {
     Swal.fire({
         title: 'Extra Breakfast',
         width: 620,
-        html: `<div style="font-size:0.85rem;color:#6c757d;margin-bottom:6px;">${readonlyBf ?'Checked out · view only' : 'Above 2 per room · remove or take 1 off for a room with fewer guests'}</div>
+        html: `<div style="font-size:0.85rem;color:#6c757d;margin-bottom:6px;">${readonlyBf ?'Checked out · view only' : `Above ${includedBreakfastPerRoom()} per room · remove or take 1 off for a room with fewer guests`}</div>
             <div style="max-height:55vh;overflow-y:auto;">
               <table class="table table-sm align-middle" style="font-size:0.9rem;margin:0;text-align:center;">
                 <thead><tr><th style="text-align:left;">Room</th><th>Type</th><th>Qty</th><th>Amount</th><th></th></tr></thead>
@@ -5064,8 +5125,8 @@ function renderGuestBill(bookingId, d) {
             const cls = indent ? 'gb-child' : '';
             const attr = indent ? `data-gb-room="${esc(indent)}"` : '';
             if (it._bf === 'incl') {
-                const included = Math.min(2, (it._a || 0) + (it._k || 0));
-                return line(`Breakfast × ${included} <small class="gb-st gb-st-paid">Free</small>`, money(0), cls, attr);
+                const included = Math.min(includedBreakfastPerRoom(), (it._a || 0) + (it._k || 0));
+                return line(`Breakfast × ${included}`, '', cls, attr);   // part of the room rate: no price of its own
             }
             const parts = [];
             if (it._a) parts.push(`${it._a} adult${it._a === 1 ? '' : 's'}`);

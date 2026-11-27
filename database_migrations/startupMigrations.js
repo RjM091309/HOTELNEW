@@ -1027,6 +1027,12 @@ async function runHoldPendingStatusBackfill() {
   }
 }
 
+// Which account moved the guest to another room (shown in Transfer History). Older transfers stay empty.
+async function runTransferLogUserMigration() {
+  if (!(await tableExists('room_transfer_logs'))) return;
+  await ensureColumn('room_transfer_logs', 'TRANSFERRED_BY', `TRANSFERRED_BY INT NULL DEFAULT NULL`, 'TRANSFER_DATE');
+}
+
 async function runBookingActualTimesMigration() {
   if (!(await tableExists('booking'))) {
     console.warn('⚠️ booking table not found, skipping actual check-in/out timestamp migration');
@@ -1377,6 +1383,7 @@ async function runStartupMigrations() {
   await runLateCheckoutServiceBackfill();
   await runHoldPendingStatusBackfill();
   await runBookingActualTimesMigration();
+  await runTransferLogUserMigration();
   await runRoomRatesMigrations();
   await runRoomRateSeasonMonthsMigration();
   await runPoolVillaRatesMigration();

@@ -2669,6 +2669,17 @@ function initializeAddBookingHandler() {
             return;
         }
 
+        // a ticked breakfast box with no persons would be saved without breakfast
+        if ($('#includeBreakfast').is(':checked')
+            && !((parseInt(formData.breakfastAdultQty, 10) || 0) + (parseInt(formData.breakfastKidQty, 10) || 0))) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Breakfast Persons Required',
+                text: 'Enter the number of persons for breakfast, or untick Breakfast.',
+            });
+            return;
+        }
+
         const needsFlightInfo = $('#includePickup').is(':checked') || $('#includeDropoff').is(':checked');
         if (needsFlightInfo && (!formData.flightNumber || !formData.flightNumber.trim() || !formData.passengerCount)) {
             Swal.fire({

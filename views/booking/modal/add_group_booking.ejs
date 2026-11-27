@@ -3957,6 +3957,8 @@
     $('#groupIncludeBreakfast').on('change', function() {
       if (this.checked) {
         applyGroupBreakfastDefaults();
+        // starts at 1 adult per room, like the single booking: a ticked box with no number was saved as "no breakfast"
+        if (!$('#groupBreakfastAdultQty').val() && !$('#groupBreakfastKidQty').val()) $('#groupBreakfastAdultQty').val(1);
         $('#groupBreakfastFields').removeClass('d-none');
         // Set default service IDs only
         if (groupBreakfastAdultBaseId) $('#groupBreakfastAdultId').val(groupBreakfastAdultBaseId);
@@ -5162,5 +5164,5 @@
   setup('groupDropoffFlightNumber', 'groupDropoffFlightNumberDropdown', 'DEPARTURE');
 })();
 </script>
-<script src="/js/booking/group_booking_submit.js?v=extra-bed-1"></script>
+<script src="/js/booking/group_booking_submit.js?v=bf-qty-1"></script>
 

@@ -202,6 +202,17 @@ $(document).ready(function () {
         return;
       }
 
+      // a ticked breakfast box with no persons would be saved without breakfast
+      if ($('#includeBreakfast').is(':checked')
+          && !((parseInt(breakfastAdultQty, 10) || 0) + (parseInt(breakfastKidQty, 10) || 0))) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Breakfast Persons Required',
+          text: 'Enter the number of persons for breakfast, or untick Breakfast.',
+        });
+        return;
+      }
+
       if (includePickup && (!flightNumber || !flightNumber.trim())) {
         Swal.fire({
           icon: 'error',

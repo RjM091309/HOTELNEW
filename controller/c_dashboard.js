@@ -618,7 +618,7 @@ class DashboardController {
         });
       }
 
-      const success = await DashboardModel.transferRoom(bookingId, oldRoomId, newRoomId, transferDate);
+      const success = await DashboardModel.transferRoom(bookingId, oldRoomId, newRoomId, transferDate, req.user?.userId || null);
       
       if (success) {
         // Get the io instance from the app
@@ -766,7 +766,8 @@ class DashboardController {
         currentRoomId,
         newRoomId,
         bookingId,
-        lateCheckoutFee
+        lateCheckoutFee,
+        req.user?.userId || null
       );
       
       if (result.success) {

@@ -529,7 +529,8 @@ class CalendarModel {
         originalCheckOut = null,
         extensionDate = null,
         oldRoomNumber = null,
-        newRoomId = null
+        newRoomId = null,
+        userId = null
       } = options || {};
 
       let isRoomTransfer = false;
@@ -578,9 +579,9 @@ class CalendarModel {
           // Log the transfer
           queryDatabasePromise(`
             INSERT INTO room_transfer_logs (
-              BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE
-            ) VALUES (?, ?, ?, NOW())
-          `, [id, currentRoom, targetRoom])
+              BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY
+            ) VALUES (?, ?, ?, NOW(), ?)
+          `, [id, currentRoom, targetRoom, userId])
         );
       } else {
         // Just update dates if same room
@@ -927,7 +928,7 @@ class CalendarModel {
   }
 
   // Transfer room (copied from dashboard logic)
-  static async transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, propertyId) {
+  static async transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, propertyId, userId = null) {
     try {
       console.log('🔄 Calendar transfer started:', { bookingId, oldRoomNumber, newRoomId, transferDate });
 
@@ -981,9 +982,9 @@ class CalendarModel {
       
       await queryDatabasePromise(`
         INSERT INTO room_transfer_logs (
-          BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE
-        ) VALUES (?, ?, ?, ?)
-      `, [bookingId, oldRoomId, newRoomId, transferDate]);
+          BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY
+        ) VALUES (?, ?, ?, ?, ?)
+      `, [bookingId, oldRoomId, newRoomId, transferDate, userId]);
       
       console.log('✅ Transfer log inserted successfully');
 
@@ -1016,10 +1017,12 @@ class CalendarModel {
           oldRoom.ROOM_NUMBER AS OldRoomNumber,
           rtl.NEW_ROOM_ID,
           newRoom.ROOM_NUMBER AS NewRoomNumber,
-          rtl.TRANSFER_DATE
+          rtl.TRANSFER_DATE,
+          u.FULLNAME AS MovedBy
         FROM room_transfer_logs rtl
         LEFT JOIN room oldRoom ON oldRoom.IDNo = rtl.OLD_ROOM_ID
         LEFT JOIN room newRoom ON newRoom.IDNo = rtl.NEW_ROOM_ID
+        LEFT JOIN user_info u ON u.IDno = rtl.TRANSFERRED_BY
         WHERE rtl.BOOKING_ID = ?
         ORDER BY rtl.TRANSFER_DATE ASC
       `, [bookingId]);
@@ -1204,10 +1207,10 @@ class CalendarModel {
 
         // Insert a record into the room_transfer_logs table
         const transferLogQuery = `
-          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE)
-          VALUES (?, ?, ?, NOW())
+          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY)
+          VALUES (?, ?, ?, NOW(), ?)
         `;
-        await queryDatabasePromise(transferLogQuery, [bookingId, currentRoomId, newRoomId]);
+        await queryDatabasePromise(transferLogQuery, [bookingId, currentRoomId, newRoomId, userId]);
       }
 
       // Insert extension record
@@ -1406,7 +1409,7 @@ class CalendarModel {
   }
 
   // Process late check-out (copied from dashboard logic)
-  static async processLateCheckout(currentRoomId, newRoomId, bookingId, lateCheckoutFee = 0) {
+  static async processLateCheckout(currentRoomId, newRoomId, bookingId, lateCheckoutFee = 0, userId = null) {
     try {
       const fee = Math.max(0, parseFloat(lateCheckoutFee) || 0);
 
@@ -1422,10 +1425,10 @@ class CalendarModel {
 
         // Log transfer in room_transfer_logs
         const logTransferQuery = `
-          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE)
-          VALUES (?, ?, ?, NOW())
+          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY)
+          VALUES (?, ?, ?, NOW(), ?)
         `;
-        await queryDatabasePromise(logTransferQuery, [bookingId, currentRoomId, newRoomId]);
+        await queryDatabasePromise(logTransferQuery, [bookingId, currentRoomId, newRoomId, userId]);
 
         // Update room status
         const updateOldRoomStatusQuery = `UPDATE room SET ROOM_STATUS = 4 WHERE IDNo = ?`;

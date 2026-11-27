@@ -1998,10 +1998,12 @@ class DashboardModel {
           oldRoom.ROOM_NUMBER AS OldRoomNumber,
           rtl.NEW_ROOM_ID,
           newRoom.ROOM_NUMBER AS NewRoomNumber,
-          rtl.TRANSFER_DATE
+          rtl.TRANSFER_DATE,
+          u.FULLNAME AS MovedBy
         FROM room_transfer_logs rtl
         LEFT JOIN room oldRoom ON oldRoom.IDNo = rtl.OLD_ROOM_ID
         LEFT JOIN room newRoom ON newRoom.IDNo = rtl.NEW_ROOM_ID
+        LEFT JOIN user_info u ON u.IDno = rtl.TRANSFERRED_BY
         WHERE rtl.BOOKING_ID = ?
         ORDER BY rtl.TRANSFER_DATE ASC
       `, [bookingId]);
@@ -2024,7 +2026,7 @@ class DashboardModel {
   }
 
   // Room transfer method
-  static async transferRoom(bookingId, oldRoomId, newRoomId, transferDate) {
+  static async transferRoom(bookingId, oldRoomId, newRoomId, transferDate, userId = null) {
     try {
       // Start transaction
       await queryDatabasePromise('START TRANSACTION');
@@ -2117,9 +2119,9 @@ class DashboardModel {
         
         await queryDatabasePromise(`
           INSERT INTO room_transfer_logs 
-          (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE) 
-          VALUES (?, ?, ?, ?)
-        `, [bookingId, oldRoomId, newRoomId, transferDate]);
+          (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY)
+          VALUES (?, ?, ?, ?, ?)
+        `, [bookingId, oldRoomId, newRoomId, transferDate, userId]);
         
         console.log('Transfer log inserted successfully');
       } catch (logError) {
@@ -2206,7 +2208,7 @@ class DashboardModel {
   }
 
   // Process late check-out
-  static async processLateCheckout(currentRoomId, newRoomId, bookingId, lateCheckoutFee = 0) {
+  static async processLateCheckout(currentRoomId, newRoomId, bookingId, lateCheckoutFee = 0, userId = null) {
     try {
       const fee = Math.max(0, parseFloat(lateCheckoutFee) || 0);
 
@@ -2222,10 +2224,10 @@ class DashboardModel {
 
         // Log transfer in room_transfer_logs
         const logTransferQuery = `
-          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE)
-          VALUES (?, ?, ?, NOW())
+          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY)
+          VALUES (?, ?, ?, NOW(), ?)
         `;
-        await queryDatabasePromise(logTransferQuery, [bookingId, currentRoomId, newRoomId]);
+        await queryDatabasePromise(logTransferQuery, [bookingId, currentRoomId, newRoomId, userId]);
 
         // Update room status
         const updateOldRoomStatusQuery = `UPDATE room SET ROOM_STATUS = 4 WHERE IDNo = ?`;
@@ -2400,10 +2402,10 @@ class DashboardModel {
         
         // Log transfer
         const logTransferQuery = `
-          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE)
-          VALUES (?, ?, ?, NOW())
+          INSERT INTO room_transfer_logs (BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE, TRANSFERRED_BY)
+          VALUES (?, ?, ?, NOW(), ?)
         `;
-        await queryDatabasePromise(logTransferQuery, [bookingId, roomId, newRoomId]);
+        await queryDatabasePromise(logTransferQuery, [bookingId, roomId, newRoomId, userId]);
         
         // Update room statuses
         await queryDatabasePromise(`UPDATE room SET ROOM_STATUS = 4 WHERE IDNo = ?`, [roomId]);

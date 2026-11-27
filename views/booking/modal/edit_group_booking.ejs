@@ -2193,6 +2193,8 @@ window.editGroupAddedServicesMap = {};
   // Service toggles
   $('#editGroupIncludeBreakfast').on('change', function() {
     if (this.checked) {
+      // starts at 1 adult per room: a ticked box with no number was saved as "no breakfast"
+      if (!$('#editGroupBreakfastAdultQty').val() && !$('#editGroupBreakfastKidQty').val()) $('#editGroupBreakfastAdultQty').val(1);
       $('#editGroupBreakfastFields').removeClass('d-none');
     } else {
       $('#editGroupBreakfastFields').addClass('d-none');
@@ -2984,12 +2986,16 @@ function updateEditGroupAddedServicesList(groupBookingId) {
                                  service.SERVICE_NAME?.toLowerCase() === 'upgrade';
                 const quantityDisplay = isUpgrade ? '-' : quantity;
                 const totalCost = serviceCost * quantity;
-                const costDisplay = (isNaN(totalCost) || totalCost === 0)
+                // the breakfast inside the room rate is not free and has no price of its own: no badge for it
+                const inRateBf = !totalCost && /^Breakfast \((Adult|Kids?)\)/i.test(service.SERVICE_NAME || '');
+                const costDisplay = inRateBf ? '' : (isNaN(totalCost) || totalCost === 0)
                     ? '<span class="badge bg-success">FREE</span>'
                     : `₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
                 let statusDisplay;
-                if (service.STATUS === 'unpaid') {
+                if (inRateBf) {
+                    statusDisplay = '';
+                } else if (service.STATUS === 'unpaid') {
                     statusDisplay = '<span class="badge bg-warning">UNPAID</span>';
                 } else if (service.STATUS === 'paid') {
                     statusDisplay = '<span class="badge bg-success">PAID</span>';
@@ -3028,12 +3034,16 @@ function updateEditGroupAddedServicesList(groupBookingId) {
                              service.SERVICE_NAME?.toLowerCase() === 'upgrade';
             const quantityDisplay = isUpgrade ? '-' : quantity;
             const totalCost = serviceCost * quantity;
-            const costDisplay = (isNaN(totalCost) || totalCost === 0)
+            // the breakfast inside the room rate is not free and has no price of its own: no badge for it
+            const inRateBf = !totalCost && /^Breakfast \((Adult|Kids?)\)/i.test(service.SERVICE_NAME || '');
+            const costDisplay = inRateBf ? '' : (isNaN(totalCost) || totalCost === 0)
                 ? '<span class="badge bg-success">FREE</span>'
                 : `₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
             let statusDisplay;
-            if (service.STATUS === 'unpaid') {
+            if (inRateBf) {
+                statusDisplay = '';
+            } else if (service.STATUS === 'unpaid') {
                 statusDisplay = '<span class="badge bg-warning">UNPAID</span>';
             } else if (service.STATUS === 'paid') {
                 statusDisplay = '<span class="badge bg-success">PAID</span>';
