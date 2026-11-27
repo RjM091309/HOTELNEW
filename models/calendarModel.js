@@ -365,7 +365,7 @@ class CalendarModel {
             FROM booking_service bs
             WHERE bs.BOOKING_ID = b.IDNo
               AND bs.ACTIVE = 1
-              AND bs.SERVICE_ID IN (74, 75)
+              AND (bs.SERVICE_ID IN (74, 75) OR bs.SERVICE_ID IN (SELECT IDNo FROM services WHERE SERVICE_NAME LIKE 'Breakfast (%'))
           ), 0) AS breakfastQty,
           -- Pre-calculated composite status for styling
           CASE

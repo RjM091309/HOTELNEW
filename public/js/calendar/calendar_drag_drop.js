@@ -12,6 +12,9 @@ async function handleEventDrop(info) {
   
   // Mark this event as successfully dropped to prevent restoration
   info.event._wasDropped = true;
+
+  // "Move Rooms": the drag moves all the selected bookings (calendar_move_rooms.js)
+  if (window.calendarMoveRooms && window.calendarMoveRooms.drop(info)) return;
   
   // Get the new resource (room) and dates
   const newResource = info.newResource;
@@ -161,6 +164,8 @@ async function handleEventDrop(info) {
 }
 
 function handleEventDragStart(info) {
+  // "Move Rooms": all the selected bookings follow the drag
+  if (window.calendarMoveRooms) window.calendarMoveRooms.dragStart(info);
 
   // Safety net: dragging an existing booking is never a group-select sweep.
   // The document-level mousedown tracker in calendar_data.js already skips
@@ -213,6 +218,7 @@ function handleEventDragStart(info) {
 }
 
 function handleEventDragStop(info) {
+  if (window.calendarMoveRooms) window.calendarMoveRooms.dragStop();
   
   // RESTORE ORIGINAL STYLING
   info.el.style.opacity = '';
@@ -244,7 +250,9 @@ function handleEventDragStop(info) {
 // =============================================================================
 
 async function handleEventResize(info) {
-  
+  // no stay is lengthened while rooms are being moved
+  if (window.calendarMoveRooms && window.calendarMoveRooms.active()) { info.revert(); return; }
+    
   // Get the new end date (checkout date)
   const newEnd = info.event.end;
   const bookingId = info.event.id;

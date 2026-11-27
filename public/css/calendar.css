@@ -2425,6 +2425,23 @@ body.calendar-drag-active {
   display: inline-block !important;
 }
 
+/* Move Rooms (calendar_move_rooms.js): Confirm only shows when bookings are selected; selected bars are outlined */
+.fc-moveRooms-button, .fc-moveRoomsConfirm-button { white-space: nowrap; }
+.fc-moveRoomsConfirm-button { display: none !important; }
+.fc-moveRoomsConfirm-button.fc-proceed-visible { display: inline-block !important; }
+body.move-rooms-on #calendar .fc-timeline-event { cursor: pointer; }
+#calendar .fc-timeline-event.move-picked { outline: 3px solid #00e5ff !important; outline-offset: 1px; box-shadow: 0 0 10px 3px rgba(0, 229, 255, 0.85) !important; filter: brightness(1.25); z-index: 9 !important; }
+#move-rooms-hint { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 1040; max-width: 90vw; padding: 9px 18px; border-radius: 999px; background: rgba(8, 40, 48, 0.94); border: 1px solid #00e5ff; color: #e6fdff; font-size: 13px; font-weight: 600; text-align: center; pointer-events: none; box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.7); }
+
+/* while dragging, our own previews show every selected booking, so the single dragged copy is hidden */
+body.move-rooms-dragging #calendar .fc-event-mirror { opacity: 0 !important; }
+body.move-rooms-dragging #calendar .fc-timeline-event.move-picked:not(.fc-event-mirror) { opacity: 0.4 !important; }
+.move-ghost { position: fixed; z-index: 1039; box-sizing: border-box; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; border-radius: 8px; font-size: 11px; font-weight: 700; pointer-events: none; }
+.move-ghost.is-ok { background: rgba(0, 191, 214, 0.75); border: 2px solid #00e5ff; color: #00181c; box-shadow: 0 0 10px rgba(0, 229, 255, 0.8); }
+.move-ghost.is-bad { background: rgba(220, 38, 38, 0.88); border: 2px dashed #ffd0d0; color: #fff; box-shadow: 0 0 12px rgba(255, 60, 60, 0.9); }
+#calendar .fc-timeline-event.move-blocking { outline: 3px solid #ff3b3b !important; outline-offset: 1px; box-shadow: 0 0 10px 3px rgba(255, 59, 59, 0.85) !important; z-index: 8 !important; }
+#move-rooms-hint.is-bad { background: rgba(74, 10, 10, 0.95); border-color: #ff5c5c; color: #ffe3e3; }
+
 /* Cleaning Rooms button (top right of the calendar) */
 .fc-cleaningRooms-button { white-space: nowrap; }
 .fc-cleaningRooms-button.has-cleaning { background: rgba(245, 159, 0, 0.22) !important; border-color: #f59f00 !important; }

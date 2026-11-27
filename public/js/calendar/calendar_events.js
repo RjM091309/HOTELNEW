@@ -313,6 +313,9 @@ function handleEventClick(info) {
     window.cleanupModalOverlays();
   }
 
+  // "Move Rooms": a click selects the booking
+  if (window.calendarMoveRooms && window.calendarMoveRooms.click(info)) return;
+
   const event = info.event;
   const status = event.extendedProps.bookingStatus;
   const bookingId = event.id;  // should match your BookingID
@@ -969,6 +972,7 @@ function attachEventTooltip(event, el) {
       // without re-attaching anything.
       content: '',
       onShow(instance) {
+        if (window.calendarMoveRooms && window.calendarMoveRooms.active()) return false;   // it would cover the bookings being moved
         const live = (window.calendar && typeof window.calendar.getEventById === 'function')
           ? (window.calendar.getEventById(event.id) || event)
           : event;
@@ -1017,6 +1021,7 @@ function handleEventDidMount(info) {
   }
 
   window.eventElements[info.event.id] = info.el;
+  if (window.calendarMoveRooms) window.calendarMoveRooms.mount(info);
   if (window.__calFocus) window.__calFocus.style(info.event.id, info.el);   // /calendar?focus=arrivals|departures: keep the highlight on re-drawn bookings
 
   // Apply the booking-highlight fill color (phase x payment status)

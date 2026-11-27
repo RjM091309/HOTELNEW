@@ -912,6 +912,27 @@ async function runEarlyCheckInMigration() {
   }
 }
 
+// Breakfast on a booking is saved as a row of the "Breakfast (Adult)" / "Breakfast (Kids)" service (IDs 74 / 75). A database
+// without them saved every booking with no breakfast. Only what is missing is added; existing services are never changed.
+async function runBreakfastServicesSeed() {
+  if (!(await tableExists('services'))) return;
+  const wanted = [[74, 'Breakfast (Adult)', '%adult%', 500], [75, 'Breakfast (Kids)', '%kid%', 350]];
+  for (const [id, name, like, cost] of wanted) {
+    const found = await queryDatabasePromise(
+      "SELECT IDNo FROM services WHERE SERVICE_NAME LIKE '%breakfast%' AND SERVICE_NAME LIKE ? AND SERVICE_NAME NOT LIKE 'extra%' LIMIT 1",
+      [like]
+    );
+    if (found.length) continue;
+    const taken = await queryDatabasePromise('SELECT IDNo FROM services WHERE IDNo = ?', [id]);
+    const result = await queryDatabasePromise(
+      `INSERT INTO services (IDNo, SERVICE_CATEGORY, SERVICE_NAME, SERVICE_DESCRIPTION, SERVICE_COST, SERVICE_AVAILABILITY, ENCODED_BY, ENCODED_DT, ACTIVE)
+       VALUES (?, 'Food & Beverage', ?, ?, ?, 'Available', 0, NOW(), 1)`,
+      [taken.length ? null : id, name, name, cost]
+    );
+    console.log(`✅ Seeded services row: ${name} (IDNo ${taken.length ? result.insertId : id})`);
+  }
+}
+
 async function runExpensesRevampMigration() {
   // Create-if-not-exists so a fresh database is fully provisioned.
   await ensureTable('expenses', `
@@ -1379,6 +1400,11 @@ async function runStartupMigrations() {
   await runCustomerNationalityMigration();
   await runBillingReceiptNoMigration();
   await runEarlyCheckInMigration();
+  try {
+    await runBreakfastServicesSeed();
+  } catch (error) {
+    console.error('⚠️ Breakfast services seed failed (app keeps starting):', error.message);
+  }
   await runExpensesRevampMigration();
   await runLateCheckoutServiceBackfill();
   await runHoldPendingStatusBackfill();
@@ -1438,6 +1464,7 @@ if (require.main === module) {
 
 module.exports = {
   runStartupMigrations,
+  runBreakfastServicesSeed,
   ensureTable,
   ensureColumn,
   tableExists,

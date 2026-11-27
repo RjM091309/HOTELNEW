@@ -93,7 +93,14 @@ router.post('/transfer-room',
   CalendarController.transferRoom
 );
 
-router.get('/transfer-logs/:bookingId', 
+// "Move Rooms": several bookings change rooms at once
+router.post('/move-rooms',
+  CalendarSecurity.csrfProtection,
+  CalendarSecurity.auditLog('ROOMS_MOVE'),
+  CalendarController.moveRooms
+);
+
+router.get('/transfer-logs/:bookingId',  
   CalendarSecurity.rateLimit,
   CalendarController.getTransferLogs
 );

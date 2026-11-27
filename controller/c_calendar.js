@@ -1,4 +1,5 @@
 const CalendarModel = require('../models/calendarModel');
+const RoomMoveModel = require('../models/roomMoveModel');
 const RoomModel = require('../models/roomModel');
 const ActivityLogModel = require('../models/activityLogModel');
 const { logActivity } = require('../utils/activityLogger');
@@ -364,6 +365,46 @@ class CalendarController {
     } catch (error) {
       console.error('Error fetching bookings:', error);
       res.status(500).json({ error: 'Failed to fetch bookings' });
+    }
+  }
+
+  // "Move Rooms": body { moves: [{ bookingId, newRoomId }], dryRun }. All the bookings move or none does.
+  static async moveRooms(req, res) {
+    try {
+      const { moves, dryRun } = req.body || {};
+      const valid = Array.isArray(moves) && moves.length > 0 && moves.length <= 100
+        && moves.every((m) => m && Number.isInteger(Number(m.bookingId)) && Number(m.bookingId) > 0
+          && Number.isInteger(Number(m.newRoomId)) && Number(m.newRoomId) > 0)
+        && new Set(moves.map((m) => Number(m.bookingId))).size === moves.length;
+      if (!valid) return res.status(400).json({ success: false, message: 'Nothing to move.' });
+      if (!req.propertyId) return res.status(400).json({ success: false, message: 'No active property.' });
+
+      const checkOnly = dryRun === true || dryRun === 'true';
+      const result = await RoomMoveModel.moveRooms({ moves, propertyId: req.propertyId, userId: req.user?.userId || null, dryRun: checkOnly });
+
+      if (result.success && !checkOnly) {
+        for (const m of result.moves) {
+          await logActivity(req, {
+            module: 'calendar',
+            action: 'ROOM_TRANSFER',
+            entityType: 'booking',
+            entityId: m.bookingId,
+            description: `Booking #${m.bookingId} moved from room ${m.fromRoom} to room ${m.toRoom} (Move Rooms)`,
+            oldData: { roomId: m.fromRoomId, room: m.fromRoom },
+            newData: { roomId: m.toRoomId, room: m.toRoom }
+          });
+        }
+        const io = req.app.get('io');
+        if (io) {
+          const eventData = { action: 'booking-updated', message: 'Rooms moved', data: { moves: result.moves, isRoomTransfer: true, timestamp: new Date().toISOString() } };
+          io.to('dashboard-room').emit('dashboard-refresh', eventData);
+          io.emit('calendar-booking-updated', eventData);
+        }
+      }
+      return res.json(result);
+    } catch (error) {
+      console.error('Error moving rooms:', error);
+      return res.status(500).json({ success: false, message: 'Server error. Nothing was moved.' });
     }
   }
 

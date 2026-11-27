@@ -1584,8 +1584,8 @@ $(document).ready(function () {
         .then(serviceData => {
             if (!Array.isArray(serviceData)) throw new Error('Invalid response format');
 
-            const adult = serviceData.find(s => s.SERVICE_NAME.includes('Adult'));
-            const kid = serviceData.find(s => s.SERVICE_NAME.includes('Kids'));
+            const adult = serviceData.find(s => /adult/i.test(s.SERVICE_NAME) && !/^extra/i.test(s.SERVICE_NAME));
+            const kid = serviceData.find(s => /kid/i.test(s.SERVICE_NAME) && !/^extra/i.test(s.SERVICE_NAME));
 
             if (adult) $('#breakfastAdultId').val(adult.IDNo);
             if (kid) $('#breakfastKidId').val(kid.IDNo);

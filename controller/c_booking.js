@@ -766,6 +766,7 @@ class BookingController {
   // Add new booking
   static async addBooking(req, res) {
     try {
+      await BookingModel.fillBreakfastServiceIds(req.body);
       // console.log('Received /add_booking request with body:', JSON.stringify(req.body, null, 2));
 
       // Standardized variable names from the form
@@ -2099,6 +2100,7 @@ class BookingController {
 
   static async addGroupBooking(req, res) {
     try {
+      await BookingModel.fillBreakfastServiceIds(req.body);
       const {
         selectedRooms,
         selectedRoomPrice,
@@ -2376,6 +2378,7 @@ class BookingController {
   // Update group booking
   static async updateGroupBooking(req, res) {
     try {
+      await BookingModel.fillBreakfastServiceIds(req.body);
       const {
         groupBookingId,
         selectedRooms,
@@ -3843,6 +3846,7 @@ class BookingController {
   // Update existing booking
   static async updateBooking(req, res) {
     try {
+      await BookingModel.fillBreakfastServiceIds(req.body);
       const bookingId = req.params.id;
       console.log('Received edit_booking request for ID:', bookingId);
 

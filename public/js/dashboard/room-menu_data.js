@@ -5081,7 +5081,16 @@ function renderGuestBill(bookingId, d) {
     // Breakfast, kept short: the free breakfast lines of a room ("Breakfast (Adult) 3 x 500 Free" + "Breakfast (Kids) 2 x 350 Free") become ONE line,
     // "Breakfast x 2  Free" (the 2 per room that are inside the room rate), and the extras above that ("Extra Breakfast (Adult) / (Kid)")
     // become ONE line "Extra breakfast - 1 adult, 2 kids" with their amount. A breakfast line that does carry a charge (older bookings) is left as it is.
+    const extraBfByRoom = new Map(); // room number -> extra breakfast persons of that room
     (function () {
+        const own = String((d.billingData && d.billingData.roomNumber) || '');
+        items.forEach((it) => {
+            const text = String(it.description || '');
+            if (!/^Extra Breakfast \((Adult|Kids?)\)/i.test(text)) return;
+            const t = text.match(roomTag);
+            const room = t ? t[1] : own;
+            extraBfByRoom.set(room, (extraBfByRoom.get(room) || 0) + (Number(it.qty) || 0));
+        });
         const inclRe = /^Breakfast \((Adult|Kids?)\)$/i, extraRe = /^Extra Breakfast \((Adult|Kids?)\)$/i;
         const slot = new Map();
         const out = [];
@@ -5097,7 +5106,7 @@ function renderGuestBill(bookingId, d) {
             const key = kind + '|' + (tag ? tag[1] : '');
             let syn = slot.get(key);
             if (!syn) {
-                syn = { _bf: kind, description: (kind === 'incl' ? 'Breakfast' : 'Extra breakfast') + (tag ? ' · Room ' + tag[1] : ''), qty: '-', basePrice: 0, subTotal: 0, status: '', _a: 0, _k: 0, _paid: true };
+                syn = { _bf: kind, _room: tag ? tag[1] : own, description: (kind === 'incl' ? 'Breakfast' : 'Extra breakfast') + (tag ? ' · Room ' + tag[1] : ''), qty: '-', basePrice: 0, subTotal: 0, status: '', _a: 0, _k: 0, _paid: true };
                 slot.set(key, syn);
                 out.push(syn);
             }
@@ -5125,7 +5134,9 @@ function renderGuestBill(bookingId, d) {
             const cls = indent ? 'gb-child' : '';
             const attr = indent ? `data-gb-room="${esc(indent)}"` : '';
             if (it._bf === 'incl') {
-                const included = Math.min(includedBreakfastPerRoom(), (it._a || 0) + (it._k || 0));
+                // the saved line counts every guest: the room's extra breakfasts are taken out (same figure as Extra Services)
+                const inRate = (it._a || 0) + (it._k || 0) - (extraBfByRoom.get(it._room) || 0);
+                const included = Math.max(0, Math.min(includedBreakfastPerRoom(), inRate));
                 return line(`Breakfast × ${included}`, '', cls, attr);   // part of the room rate: no price of its own
             }
             const parts = [];

@@ -1567,7 +1567,7 @@ class BookingModel {
             FROM booking_service bs
             WHERE bs.BOOKING_ID = b.IDNo
               AND bs.ACTIVE = 1
-              AND bs.SERVICE_ID IN (74, 75)
+              AND (bs.SERVICE_ID IN (74, 75) OR bs.SERVICE_ID IN (SELECT IDNo FROM services WHERE SERVICE_NAME LIKE 'Breakfast (%'))
           ), 0) AS BREAKFAST_QTY,
 
           EXISTS (
@@ -9924,6 +9924,22 @@ class BookingModel {
     } catch (error) {
       console.error('Error in generateGroupVoucher:', error);
       throw error;
+    }
+  }
+
+  // Breakfast is saved under the "Breakfast (Adult)" / "(Kids)" service. A form that could not find that service sends no ID and
+  // the breakfast was silently left out of the booking: the ID is looked up here instead. Fills it into the request body.
+  static async fillBreakfastServiceIds(body) {
+    if (!body) return;
+    for (const [kind, preferred, like] of [['Adult', 74, '%adult%'], ['Kid', 75, '%kid%']]) {
+      if (!(parseInt(body[`breakfast${kind}Qty`], 10) > 0) || body[`breakfast${kind}Id`]) continue;
+      const rows = await queryDatabasePromise(
+        `SELECT IDNo FROM services WHERE SERVICE_NAME LIKE '%breakfast%' AND SERVICE_NAME LIKE ? AND SERVICE_NAME NOT LIKE 'extra%'
+         ORDER BY (IDNo = ?) DESC, ACTIVE DESC, IDNo LIMIT 1`,
+        [like, preferred]
+      );
+      if (rows.length) body[`breakfast${kind}Id`] = rows[0].IDNo;
+      else console.warn(`Breakfast not saved: there is no Breakfast (${kind}) service in the services table.`);
     }
   }
 

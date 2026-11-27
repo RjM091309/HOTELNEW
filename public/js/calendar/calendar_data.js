@@ -1347,6 +1347,7 @@ let groupDragAnchorRoomId = null;
 function attachGroupSelectDragTracking() {
   document.addEventListener('mousedown', function(e) {
     if (groupCreateModeActive) return;
+    if (window.calendarMoveRooms && window.calendarMoveRooms.active()) return;
     // findResourceIdAtY only tests the click's Y-coordinate against room row
     // bounding rects - it never checks that the click actually landed inside
     // the calendar. Room rows tile the full page height, so ANY mousedown
@@ -2194,9 +2195,25 @@ const customButtons = {
     }
   },
 
+  // Move several bookings to other rooms at once (calendar_move_rooms.js)
+  moveRooms: {
+    text: 'Move Rooms',
+    click: function() {
+      if (window.calendarMoveRooms) window.calendarMoveRooms.toggle();
+    }
+  },
+
+  moveRoomsConfirm: {
+    text: 'Confirm',
+    click: function() {
+      if (window.calendarMoveRooms) window.calendarMoveRooms.confirmSelection();
+    }
+  },
+
   groupCreateToggle: {
     text: 'Create Group Booking',
     click: function() {
+      if (window.calendarMoveRooms) window.calendarMoveRooms.exit();
       toggleGroupCreateMode();
     }
   },
@@ -3282,6 +3299,8 @@ const findHeader = setInterval(() => {
     selectable: true,
     selectOverlap: true,
     selectAllow: function(selectInfo) {
+      // while rooms are being moved, dragging over empty days does not start a booking
+      if (window.calendarMoveRooms && window.calendarMoveRooms.active()) return false;
       if (!selectInfo.resource || isFloorResourceId(selectInfo.resource.id)) {
         return false;
       }
@@ -3389,7 +3408,7 @@ const findHeader = setInterval(() => {
       // Removed for the calendar rework (all properties): K/Q bed filters, < Today >, and
       // Full Screen / week / month / prev / next. Their definitions stay in customButtons
       // above so they can be put back by adding the names here again.
-      left:  'searchBox groupCreateToggle groupCreateProceed',
+      left:  'searchBox moveRooms moveRoomsConfirm groupCreateToggle groupCreateProceed',
       center:'title',
       right: 'cleaningRooms'
     },
